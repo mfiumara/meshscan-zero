@@ -16,7 +16,7 @@ So meshscan hops between presets, saves everything it hears to SQLite, and shows
 - **MeshCore:** decodes adverts (name, type, location, public key), logs the relay path, and decrypts the Public group channel.
 - **Meshtastic:** decrypts the default channel (`AQ==`) and extracts node info, position, telemetry, and text.
 - Keeps a node table (first seen, last seen, packet count, last RSSI/SNR), like a normal mesh node does.
-- Serves a dashboard on port 8080 with a Leaflet map, node list, preset stats, directly heard relays, messages, and recent packets.
+- Serves a live dashboard on port 8080: packets stream in over Server-Sent Events, nodes on a MapLibre vector map (OpenFreeMap, no API key), what the radio is listening to right now, noise floor, relays, presets, and messages. Works on phones too.
 
 | Slot | Freq | SF | BW | Dwell |
 |---|---|---|---|---|

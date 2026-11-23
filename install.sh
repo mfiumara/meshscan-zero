@@ -6,6 +6,7 @@ cd "$(dirname "$0")"
 apt-get install -y -qq python3-venv python3-smbus2 python3-spidev python3-libgpiod python3-cryptography >/dev/null
 mkdir -p /opt/meshscan /var/lib/meshscan
 install -m 755 meshscan.py meshscan-web.py meshscan-report.py /opt/meshscan/
+install -d /opt/meshscan/web && install -m 644 web/index.html /opt/meshscan/web/
 [ -x /opt/meshscan/venv/bin/python ] || python3 -m venv --system-site-packages /opt/meshscan/venv
 /opt/meshscan/venv/bin/pip install -q meshtastic   # protobuf definitions for Meshtastic decoding
 printf '#!/bin/sh\nexec /opt/meshscan/venv/bin/python /opt/meshscan/meshscan-report.py "$@"\n' > /usr/local/bin/meshscan-report

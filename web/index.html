@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#07090d">
+<title>meshscan · CardputerZero</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<style>
+:root{
+  --bg:#06080c;--panel:rgba(18,22,30,.72);--panel-2:rgba(255,255,255,.025);--line:rgba(255,255,255,.07);--line-2:rgba(255,255,255,.12);
+  --text:#e9edf3;--muted:#8a93a3;--dim:#5b6372;
+  --mc:#5eb1ff;--mt:#5ee3a1;--raw:#c49bff;--warn:#ffb86b;--bad:#ff6b81;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --r:16px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 Inter,ui-sans-serif,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;
+  background:radial-gradient(900px 500px at 10% -10%,rgba(94,177,255,.13),transparent 60%),
+             radial-gradient(800px 500px at 100% 0%,rgba(94,227,161,.08),transparent 60%),
+             radial-gradient(700px 600px at 50% 120%,rgba(196,155,255,.07),transparent 60%)}
+.wrap{max-width:1480px;margin:0 auto;padding:20px 22px 40px}
+/* header */
+header{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+.logo{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;
+  background:linear-gradient(145deg,rgba(94,177,255,.25),rgba(94,227,161,.15));border:1px solid var(--line-2);box-shadow:0 8px 30px rgba(94,177,255,.18)}
+.brand h1{font-size:17px;font-weight:650;letter-spacing:-.01em;margin:0}
+.brand p{margin:0;color:var(--muted);font-size:12.5px}
+.spacer{flex:1}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:7px 12px;border-radius:999px;background:var(--panel-2);border:1px solid var(--line);font-size:12.5px;color:var(--muted);white-space:nowrap}
+.live .dot{width:8px;height:8px;border-radius:50%;background:var(--mt);box-shadow:0 0 0 0 rgba(94,227,161,.6);animation:ping 1.8s infinite}
+.live b{color:var(--text);font-weight:600;letter-spacing:.06em;font-size:11.5px}
+.live.off .dot{background:var(--warn);animation:none}
+@keyframes ping{0%{box-shadow:0 0 0 0 rgba(94,227,161,.55)}70%{box-shadow:0 0 0 9px rgba(94,227,161,0)}100%{box-shadow:0 0 0 0 rgba(94,227,161,0)}}
+/* cards */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  box-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 20px 50px -30px rgba(0,0,0,.8)}
+.card h2{margin:0;font-size:13px;font-weight:600;letter-spacing:.01em}
+.card .hd{display:flex;align-items:center;gap:10px;padding:14px 16px 10px}
+.card .hd .sub{color:var(--dim);font-size:12px}
+.kpis{display:grid;grid-template-columns:repeat(3,minmax(150px,1fr)) minmax(300px,1.6fr) minmax(240px,1.3fr);gap:14px;margin-bottom:14px}
+.kpi{padding:15px 16px 14px;position:relative;overflow:hidden}
+.kpi .lbl{color:var(--muted);font-size:12px;font-weight:500;display:flex;align-items:center;gap:7px}
+.kpi .val{font-size:30px;font-weight:650;letter-spacing:-.03em;margin-top:6px;font-variant-numeric:tabular-nums}
+.kpi .foot{color:var(--dim);font-size:12px;margin-top:2px}
+.kpi .foot b{color:var(--muted);font-weight:500}
+.bump{animation:bump .6s ease}
+@keyframes bump{0%{color:var(--mt);transform:translateY(-2px)}100%{color:inherit;transform:none}}
+.listen .row{display:flex;align-items:baseline;gap:10px;margin-top:6px}
+.listen .row{flex-wrap:wrap}.listen .name{white-space:nowrap;font-size:19px;font-weight:650;letter-spacing:-.02em}
+.listen .rf{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.bar{height:6px;border-radius:9px;background:rgba(255,255,255,.06);overflow:hidden;margin-top:12px}
+.bar i{display:block;height:100%;border-radius:9px;background:linear-gradient(90deg,var(--mc),var(--mt));transition:width 1s linear}
+.listen .meta{display:flex;gap:14px;margin-top:9px;color:var(--dim);font-size:12px;font-variant-numeric:tabular-nums}
+.listen .meta b{color:var(--text);font-weight:600}
+.noise svg{width:100%;height:46px;display:block;margin-top:8px}
+/* main grid */
+.main{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:14px;margin-bottom:14px}
+#mapcard{position:relative;overflow:hidden;min-height:560px}
+#map{position:absolute;inset:0}
+.legend{position:absolute;left:14px;top:14px;z-index:2;display:flex;gap:8px}
+.legend .pill{background:rgba(10,13,18,.75);backdrop-filter:blur(10px)}
+.sw{width:9px;height:9px;border-radius:50%}
+.maplibregl-ctrl-attrib{background:rgba(10,13,18,.7)!important;color:var(--dim)!important;font-size:10.5px}
+.maplibregl-ctrl-attrib a{color:var(--muted)!important}
+.maplibregl-ctrl-group{background:rgba(14,18,25,.85)!important;border:1px solid var(--line)!important;box-shadow:none!important}
+.maplibregl-ctrl-group button span{filter:invert(1) opacity(.75)}
+.mk{width:16px;height:16px;border-radius:50%;position:relative;cursor:pointer;border:2px solid rgba(255,255,255,.9);box-shadow:0 0 18px var(--c),0 0 0 4px color-mix(in srgb,var(--c) 25%,transparent);background:var(--c)}
+.mk::after{content:"";position:absolute;inset:-2px;border-radius:50%;border:2px solid var(--c);opacity:0}
+.mk.flash::after{animation:ring 1.6s ease-out 2}
+.mk.repeater{border-radius:5px;transform:rotate(45deg)}
+@keyframes ring{0%{transform:scale(1);opacity:.9}100%{transform:scale(4.2);opacity:0}}
+.maplibregl-popup-content{background:rgba(14,18,25,.96);color:var(--text);border:1px solid var(--line-2);border-radius:12px;padding:12px 14px;box-shadow:0 20px 40px rgba(0,0,0,.5);font:13px Inter,sans-serif}
+.maplibregl-popup-tip{border-top-color:rgba(14,18,25,.96)!important;border-bottom-color:rgba(14,18,25,.96)!important}
+.maplibregl-popup-close-button{color:var(--muted);font-size:16px;right:4px;top:2px}
+.pop h3{margin:0 0 2px;font-size:14px;font-weight:650}
+.pop .k{color:var(--dim);font-size:12px}
+.pop .g{display:grid;grid-template-columns:auto auto;gap:3px 14px;margin-top:8px;font-size:12px}
+.pop .g span:nth-child(odd){color:var(--dim)}
+/* feed */
+#feedcard{display:flex;flex-direction:column;max-height:560px}
+#feed{list-style:none;margin:0;padding:0 8px 8px;overflow:auto;flex:1}
+#feed li{display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;align-items:center;padding:10px 10px;border-radius:12px;border:1px solid transparent}
+#feed li+li{border-top:1px solid var(--line);border-radius:0}
+#feed li.new{animation:slide .7s cubic-bezier(.2,.8,.2,1)}
+#feed li.new{background:linear-gradient(90deg,rgba(94,177,255,.10),transparent 70%)}
+@keyframes slide{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+.tag{font:600 10.5px/1 var(--mono);letter-spacing:.04em;padding:5px 7px;border-radius:7px;border:1px solid;white-space:nowrap}
+.f-main{min-width:0}
+.f-main .t{font-weight:550;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.f-main .s{color:var(--dim);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--mono)}
+.f-r{text-align:right;font-variant-numeric:tabular-nums;font-size:12px;color:var(--muted)}
+.f-r .ago{color:var(--dim);font-size:11.5px}
+.sig{display:inline-flex;gap:2px;align-items:flex-end;height:12px;vertical-align:-1px;margin-right:6px}
+.sig i{width:3px;border-radius:1px;background:rgba(255,255,255,.14)}
+.sig i:nth-child(1){height:4px}.sig i:nth-child(2){height:7px}.sig i:nth-child(3){height:10px}.sig i:nth-child(4){height:13px}
+.sig i.on{background:var(--c,var(--mt))}
+/* tables */
+.grid3{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:14px}
+.tools{display:flex;gap:8px;margin-left:auto;align-items:center}
+.seg{display:inline-flex;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:2px}
+.seg button{all:unset;cursor:pointer;padding:5px 10px;border-radius:8px;font-size:12px;color:var(--muted)}
+.seg button.on{background:rgba(255,255,255,.08);color:var(--text)}
+input.search{all:unset;padding:6px 10px;border-radius:10px;background:var(--panel-2);border:1px solid var(--line);font-size:12.5px;width:170px;color:var(--text)}
+input.search::placeholder{color:var(--dim)}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{color:var(--dim);font-weight:500;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;text-align:left;padding:8px 16px;border-bottom:1px solid var(--line)}
+.tbl td{padding:10px 16px;border-bottom:1px solid var(--line);white-space:nowrap;font-variant-numeric:tabular-nums}
+.tbl tr:last-child td{border-bottom:0}
+.tbl tbody tr{transition:background .2s}
+.tbl tbody tr:hover{background:rgba(255,255,255,.025);cursor:pointer}
+.tbl .nm{font-weight:550;max-width:260px;overflow:hidden;text-overflow:ellipsis}
+.tbl .id{font-family:var(--mono);font-size:12px;color:var(--dim)}
+.tbl .r{text-align:right}
+.scroll{overflow:auto;max-height:430px}
+.proto{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.hbar{display:grid;grid-template-columns:150px 1fr 64px;align-items:center;gap:12px;padding:9px 16px}
+.hbar .n{font-family:var(--mono);font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hbar .b{height:8px;border-radius:6px;background:rgba(255,255,255,.05);overflow:hidden}
+.hbar .b i{display:block;height:100%;border-radius:6px}
+.hbar .v{text-align:right;font-variant-numeric:tabular-nums;font-size:12.5px}
+.hbar .v small{display:block;color:var(--dim);font-size:11px}
+.empty{color:var(--dim);padding:18px 16px;font-size:13px}
+.msg{padding:11px 16px;border-bottom:1px solid var(--line)}
+.msg .m1{display:flex;gap:8px;color:var(--dim);font-size:12px}
+.msg .m2{margin-top:3px}
+footer{color:var(--dim);font-size:12px;text-align:center;margin-top:26px}
+footer a{color:var(--muted)}
+@media (max-width:1200px){.kpis{grid-template-columns:repeat(3,1fr)}.kpis .listen,.kpis .noise{grid-column:span 3}.main{grid-template-columns:1fr}#feedcard{max-height:420px}.grid3{grid-template-columns:1fr}}
+@media (max-width:640px){.wrap{padding:14px 12px 30px}.kpis{grid-template-columns:1fr 1fr}.kpis .listen,.kpis .noise,.kpis .kpi:nth-child(3){grid-column:span 2}.kpi .val{font-size:24px}#mapcard{min-height:380px}.hide-sm{display:none}header .pill.clock{display:none}input.search{width:110px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#e9edf3" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="1.6" fill="#e9edf3"/><path d="M7.8 16.2a6 6 0 0 1 0-8.4M16.2 7.8a6 6 0 0 1 0 8.4"/><path d="M4.9 19.1a10 10 0 0 1 0-14.2M19.1 4.9a10 10 0 0 1 0 14.2" opacity=".55"/></svg></div>
+  <div class="brand"><h1>meshscan</h1><p>CardputerZero · Cap LoRa-1262 · receive-only</p></div>
+  <div class="spacer"></div>
+  <span class="pill clock" id="clock">--:--:--</span>
+  <span class="pill live off" id="live"><span class="dot"></span><b>CONNECTING</b></span>
+</header>
+
+<section class="kpis">
+  <div class="card kpi"><div class="lbl">Packets</div><div class="val" id="k-pk">–</div><div class="foot"><b id="k-pkh">–</b> in the last hour</div></div>
+  <div class="card kpi"><div class="lbl">Nodes</div><div class="val" id="k-nd">–</div><div class="foot" id="k-ndf">–</div></div>
+  <div class="card kpi"><div class="lbl">Relays heard</div><div class="val" id="k-rl">–</div><div class="foot">MeshCore path hashes</div></div>
+  <div class="card kpi listen">
+    <div class="lbl"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h3l3-8 4 16 3-8h7"/></svg>Now listening</div>
+    <div class="row"><span class="name" id="l-name">–</span><span class="rf" id="l-rf"></span></div>
+    <div class="bar"><i id="l-bar" style="width:0"></i></div>
+    <div class="meta"><span><b id="l-pk">0</b> packets</span><span><b id="l-pre">0</b> preambles</span><span><b id="l-crc">0</b> CRC err</span><span class="spacer"></span><span id="l-left">–</span></div>
+  </div>
+  <div class="card kpi noise"><div class="lbl">Noise floor</div>
+    <div class="row" style="display:flex;align-items:baseline;gap:8px;margin-top:6px"><span class="val" style="margin:0;font-size:22px" id="n-val">–</span><span class="rf" style="color:var(--dim);font-size:12px">dBm · last 20 min</span></div>
+    <svg id="n-spark" viewBox="0 0 300 46" preserveAspectRatio="none"></svg>
+  </div>
+</section>
+
+<section class="main">
+  <div class="card" id="mapcard">
+    <div id="map"></div>
+    <div class="legend"><span class="pill"><span class="sw" style="background:var(--mc)"></span>MeshCore</span><span class="pill"><span class="sw" style="background:var(--mt)"></span>Meshtastic</span><span class="pill hide-sm" id="mapcount">0 located</span></div>
+  </div>
+  <div class="card" id="feedcard">
+    <div class="hd"><h2>Live traffic</h2><span class="sub" id="feedsub"></span></div>
+    <ul id="feed"></ul>
+  </div>
+</section>
+
+<section class="grid3">
+  <div class="card">
+    <div class="hd"><h2>Nodes</h2>
+      <div class="tools"><div class="seg" id="filt"><button class="on" data-f="all">All</button><button data-f="meshcore">MeshCore</button><button data-f="meshtastic">Meshtastic</button></div><input class="search" id="search" placeholder="Search…"></div>
+    </div>
+    <div class="scroll"><table class="tbl"><thead><tr><th>Name</th><th class="hide-sm">Type</th><th>Signal</th><th class="r">Pkts</th><th class="r">Last</th></tr></thead><tbody id="nodes"></tbody></table></div>
+  </div>
+  <div class="card">
+    <div class="hd"><h2>Relays heard directly</h2><span class="sub">last hop before you</span></div>
+    <div class="scroll" id="hops"></div>
+  </div>
+  <div class="card">
+    <div class="hd"><h2>Presets</h2><span class="sub">last 24 h</span></div>
+    <div id="stats"></div>
+    <div class="hd" style="padding-top:18px"><h2>Messages</h2><span class="sub">decodable channels only</span></div>
+    <div id="msgs"></div>
+  </div>
+</section>
+<footer>meshscan · never transmits · <a href="https://github.com/mfiumara/meshscan-zero">github.com/mfiumara/meshscan-zero</a></footer>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fx=(x,d=0)=>x==null||isNaN(x)?'–':Number(x).toFixed(d);
+const now=()=>Date.now()/1000;
+const ago=t=>{if(!t)return'–';const s=Math.max(0,now()-t);return s<60?Math.round(s)+'s':s<3600?Math.round(s/60)+'m':s<86400?Math.round(s/3600)+'h':Math.round(s/86400)+'d'};
+const COL={meshcore:'var(--mc)',meshtastic:'var(--mt)',raw:'var(--raw)'};
+const HEX={meshcore:'#5eb1ff',meshtastic:'#5ee3a1',raw:'#c49bff'};
+const TYPE={ADVERT:'#5eb1ff',GRP_TXT:'#c49bff',TXT_MSG:'#ff9ed2',REQ:'#ffb86b',RESPONSE:'#ffd479',PATH:'#7ee0e8',ACK:'#8a93a3',TRACE:'#7ee0e8',ANON_REQ:'#ffb86b',CONTROL:'#8a93a3'};
+const PRETTY={meshcore_nl_sf7:'MeshCore NL',meshtastic_longfast:'Meshtastic LongFast',meshtastic_mediumfast:'Meshtastic MediumFast',meshcore_eu_narrow_sf8:'MeshCore EU Narrow',raw_lorawan_868_1_sf7:'LoRaWAN 868.1','raw_lorawan_868.1_sf7':'LoRaWAN 868.1'};
+const pretty=c=>PRETTY[c]||c;
+const bars=(snr,c)=>{const n=snr==null?0:snr>=5?4:snr>=0?3:snr>=-7?2:snr>=-13?1:0;return `<span class="sig" style="--c:${c}">${[1,2,3,4].map(i=>`<i class="${i<=n?'on':''}"></i>`).join('')}</span>`};
+const j=u=>fetch(u,{cache:'no-store'}).then(r=>r.json());
+let NODES=[],filter='all',query='',maxId=0;
+
+/* ---------- map ---------- */
+const map=new maplibregl.Map({container:'map',style:'https://tiles.openfreemap.org/styles/dark',center:[4.9,52.37],zoom:8,attributionControl:{compact:true}});
+map.addControl(new maplibregl.NavigationControl({showCompass:false}),'top-right');
+const markers=new Map();let fitted=false;
+function popupHtml(n){return `<div class="pop"><h3>${esc(n.name||n.short_name||n.node_id)}</h3><div class="k">${esc(n.proto)} · ${esc(n.kind||n.hw||'node')}</div>
+<div class="g"><span>RSSI</span><span>${fx(n.last_rssi,1)} dBm</span><span>SNR</span><span>${fx(n.last_snr,1)} dB</span><span>Packets</span><span>${n.packets}</span><span>First seen</span><span>${ago(n.first_seen)} ago</span><span>Last seen</span><span>${ago(n.last_seen)} ago</span><span>ID</span><span style="font-family:var(--mono)">${esc(n.node_id)}</span></div></div>`}
+function renderMap(){
+  const pts=[];
+  NODES.filter(n=>n.lat&&n.lon).forEach(n=>{
+    const key=n.proto+n.node_id;pts.push([n.lon,n.lat]);
+    let m=markers.get(key);
+    if(!m){const el=document.createElement('div');el.className='mk'+(n.kind==='repeater'?' repeater':'');el.style.setProperty('--c',HEX[n.proto]||'#fff');
+      m=new maplibregl.Marker({element:el}).setLngLat([n.lon,n.lat]).setPopup(new maplibregl.Popup({offset:14,closeButton:true})).addTo(map);markers.set(key,m);m._seen=n.last_seen}
+    else if(n.last_seen>m._seen){m._seen=n.last_seen;flash(m)}
+    m.getPopup().setHTML(popupHtml(n));
+  });
+  $('#mapcount').textContent=pts.length+' located';
+  if(pts.length&&!fitted){fitted=true;const b=pts.reduce((b,p)=>b.extend(p),new maplibregl.LngLatBounds(pts[0],pts[0]));map.fitBounds(b,{padding:70,maxZoom:11,duration:0})}
+}
+function flash(m){const el=m.getElement();el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash')}
+function focusNode(n){const m=markers.get(n.proto+n.node_id);if(!m)return;map.flyTo({center:m.getLngLat(),zoom:Math.max(map.getZoom(),11),speed:1.4});m.togglePopup();flash(m)}
+
+/* ---------- KPIs ---------- */
+function setVal(sel,v){const el=$(sel);const s=String(v);if(el.textContent!==s){el.textContent=s;el.classList.remove('bump');void el.offsetWidth;el.classList.add('bump')}}
+async function loadSummary(){const s=await j('/api/summary');setVal('#k-pk',(s.n||0).toLocaleString());$('#k-pkh').textContent=s.hour;setVal('#k-nd',s.nodes);setVal('#k-rl',s.relays);maxId=Math.max(maxId,s.max_id||0)}
+
+/* ---------- nodes ---------- */
+function renderNodes(){
+  const mc=NODES.filter(n=>n.proto==='meshcore').length,mt=NODES.length-mc;
+  $('#k-ndf').innerHTML=`<b style="color:var(--mc)">${mc}</b> MeshCore · <b style="color:var(--mt)">${mt}</b> Meshtastic`;
+  const rows=NODES.filter(n=>(filter==='all'||n.proto===filter)&&(!query||`${n.name} ${n.short_name} ${n.node_id} ${n.kind} ${n.hw}`.toLowerCase().includes(query)));
+  $('#nodes').innerHTML=rows.length?rows.map((n,i)=>`<tr data-i="${NODES.indexOf(n)}"><td><div class="proto"><span class="sw" style="background:${COL[n.proto]}"></span><span class="nm" style="color:var(--text)">${esc(n.name||n.short_name||'unknown')}</span></div><div class="id">${esc(n.node_id)}</div></td>
+  <td class="hide-sm" style="color:var(--muted)">${esc(n.kind||n.hw||'–')}</td><td>${bars(n.last_snr,COL[n.proto])}<span style="color:var(--muted)">${fx(n.last_rssi)} dBm</span></td><td class="r">${n.packets}</td><td class="r ago-c" data-t="${n.last_seen}" style="color:var(--muted)">${ago(n.last_seen)}</td></tr>`).join(''):`<tr><td colspan="5" class="empty">No nodes yet. They show up as adverts arrive.</td></tr>`;
+}
+$('#nodes').addEventListener('click',e=>{const tr=e.target.closest('tr[data-i]');if(tr)focusNode(NODES[+tr.dataset.i])});
+$('#filt').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;filter=b.dataset.f;[...$('#filt').children].forEach(x=>x.classList.toggle('on',x===b));renderNodes()});
+$('#search').addEventListener('input',e=>{query=e.target.value.toLowerCase();renderNodes()});
+async function loadNodes(){NODES=await j('/api/nodes');renderNodes();renderMap()}
+
+/* ---------- hops / stats / msgs ---------- */
+async function loadSide(){
+  const [hops,stats,msgs]=await Promise.all([j('/api/hops'),j('/api/stats'),j('/api/messages')]);
+  const hm=Math.max(1,...hops.map(h=>h.packets));
+  $('#hops').innerHTML=hops.length?hops.slice(0,14).map(h=>`<div class="hbar"><span class="n">${bars(h.last_snr,'var(--mc)')}${esc(h.id)}</span><span class="b"><i style="width:${100*h.packets/hm}%;background:linear-gradient(90deg,rgba(94,177,255,.5),var(--mc))"></i></span><span class="v">${h.packets}<small>${fx(h.last_rssi)} dBm</small></span></div>`).join(''):'<div class="empty">No relayed packets yet.</div>';
+  const sm=Math.max(1,...stats.map(s=>s.packets));
+  $('#stats').innerHTML=stats.length?stats.map(s=>{const c=s.config.startsWith('meshcore')?'var(--mc)':s.config.startsWith('meshtastic')?'var(--mt)':'var(--raw)';
+    return `<div class="hbar"><span class="n" style="font-family:Inter;color:var(--text)">${esc(pretty(s.config))}</span><span class="b"><i style="width:${Math.max(2,100*s.packets/sm)}%;background:${c}"></i></span><span class="v">${s.packets}<small>${Math.round(s.secs/60)} min</small></span></div>`}).join(''):'<div class="empty">Waiting for the first full dwell…</div>';
+  $('#msgs').innerHTML=msgs.length?msgs.slice(0,8).map(m=>`<div class="msg"><div class="m1"><span style="color:${COL[m.proto]}">${esc(m.proto)}</span><span>${esc(m.channel||'')}</span><span>${esc(m.src||'')}</span><span class="spacer"></span><span class="ago-c" data-t="${m.ts}">${ago(m.ts)}</span></div><div class="m2">${esc(m.text)}</div></div>`).join(''):'<div class="empty">Nothing decoded yet. Most group traffic here is on private or hashtag channels.</div>';
+}
+
+/* ---------- feed ---------- */
+function pktView(p){
+  let d={};try{d=JSON.parse(p.decoded||'{}')}catch(e){}
+  const proto=p.config.startsWith('meshcore')?'meshcore':p.config.startsWith('meshtastic')?'meshtastic':'raw';
+  let tag,title,sub,tc;
+  if(!p.crc_ok){tag='CRC';tc='var(--bad)';title='Corrupted packet';sub=`${p.len} B · ${pretty(p.config)}`}
+  else if(proto==='meshcore'&&d.type){tag=d.type.replace('_',' ');tc=TYPE[d.type]||'var(--muted)';
+    title=d.name?esc(d.name):d.type==='ADVERT'?'Advert':d.type==='GRP_TXT'?`Group message · ch ${d.channel_hash}`:d.type==='TXT_MSG'?'Direct message':d.type==='REQ'?'Request':d.type==='RESPONSE'?'Response':esc(d.type);
+    if(d.text)title=esc(d.text);
+    sub=`${d.hops} hop${d.hops==1?'':'s'}${d.path&&d.path.length?' · via '+esc(d.path.slice(-3).join('›')):''}`}
+  else if(proto==='meshtastic'&&d.src){tag=(d.port||'ENCRYPTED').replace('_APP','');tc=d.decrypted?'var(--mt)':'var(--muted)';
+    title=esc(d.user?.long_name||d.text||(d.decrypted?d.port:'Encrypted packet'));sub=`${esc(d.src)} → ${esc(d.dst)} · hop ${d.hop_start-d.hop_limit}/${d.hop_start}`}
+  else{tag='RAW';tc='var(--raw)';title=`${p.len} byte frame`;sub=pretty(p.config)}
+  return `<span class="tag" style="color:${tc};border-color:color-mix(in srgb,${tc} 35%,transparent);background:color-mix(in srgb,${tc} 10%,transparent)">${esc(tag)}</span>
+  <div class="f-main"><div class="t">${title}</div><div class="s">${sub}</div></div>
+  <div class="f-r">${bars(p.snr,COL[proto])}${fx(p.rssi)}<div class="ago ago-c" data-t="${p.ts}">${ago(p.ts)}</div></div>`;
+}
+function addPkt(p,isNew){
+  const li=document.createElement('li');li.innerHTML=pktView(p);if(isNew)li.className='new';
+  const f=$('#feed');f.prepend(li);while(f.children.length>120)f.lastChild.remove();
+}
+async function loadFeed(){const ps=await j('/api/packets');$('#feed').innerHTML='';ps.reverse().forEach(p=>addPkt(p,false));if(ps.length)maxId=Math.max(maxId,ps[ps.length-1].id)}
+
+/* ---------- status ---------- */
+let ST=null;
+function renderStatus(){
+  if(!ST||!ST.config)return;
+  $('#l-name').textContent=pretty(ST.config);$('#l-name').style.color=COL[ST.proto];
+  $('#l-rf').textContent=`${ST.freq} MHz · SF${ST.sf} · ${ST.bw} kHz`;
+  const tot=ST.end-ST.start,el=Math.min(tot,now()-ST.start);$('#l-bar').style.width=(100*el/tot)+'%';
+  const left=Math.max(0,ST.end-now());$('#l-left').textContent=`${Math.floor(left/60)}:${String(Math.floor(left%60)).padStart(2,'0')} left`;
+  $('#l-pk').textContent=ST.stats.packets;$('#l-pre').textContent=ST.stats.pre;$('#l-crc').textContent=ST.stats.crc;
+  if(ST.noise!=null)$('#n-val').textContent=fx(ST.noise);
+  const h=ST.noise_hist||[];if(h.length>1){const vs=h.map(x=>x[1]),lo=Math.min(...vs)-2,hi=Math.max(...vs)+2,W=300,Hh=46;
+    const xy=h.map((x,i)=>[i*W/(h.length-1),Hh-(x[1]-lo)/(hi-lo)*(Hh-6)-3]);
+    const line=xy.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+    $('#n-spark').innerHTML=`<defs><linearGradient id="ng" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#5eb1ff" stop-opacity=".35"/><stop offset="1" stop-color="#5eb1ff" stop-opacity="0"/></linearGradient></defs><path d="${line} L${W} ${Hh} L0 ${Hh}Z" fill="url(#ng)"/><path d="${line}" fill="none" stroke="#5eb1ff" stroke-width="1.6" vector-effect="non-scaling-stroke"/>`}
+}
+
+/* ---------- live stream ---------- */
+let es,refreshT,sideT;
+function connect(){
+  es=new EventSource('/api/stream?since='+maxId);
+  es.onopen=()=>{$('#live').classList.remove('off');$('#live b').textContent='LIVE'};
+  es.onerror=()=>{$('#live').classList.add('off');$('#live b').textContent='RECONNECTING'};
+  es.addEventListener('status',e=>{ST=JSON.parse(e.data);renderStatus()});
+  es.addEventListener('packet',e=>{const p=JSON.parse(e.data);if(p.id<=maxId)return;maxId=p.id;addPkt(p,true);
+    $('#feedsub').textContent='last packet just now';
+    clearTimeout(refreshT);refreshT=setTimeout(()=>{loadSummary();loadNodes()},600);
+    if(!sideT)sideT=setTimeout(()=>{sideT=null;loadSide()},8000);});
+}
+setInterval(()=>{document.querySelectorAll('.ago-c').forEach(el=>el.textContent=ago(+el.dataset.t));renderStatus();
+  $('#clock').textContent=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'})},1000);
+setInterval(()=>{loadSide();loadSummary()},60000);
+(async()=>{await Promise.all([loadSummary(),loadFeed(),loadSide(),j('/api/status').then(s=>{ST=s;renderStatus()})]);
+  loadNodes();connect()})();
+</script>
+</body>
+</html>

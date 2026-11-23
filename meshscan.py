@@ -270,6 +270,20 @@ def store(db, c, data, rssi, snr, crc_ok):
 
 # ---------------------------------------------------------------- main loop
 RUNNING = True
+STATUS = os.path.join(os.path.dirname(DB), "status.json")
+NOISE_HIST = []  # (ts, dBm, config) for the dashboard sparkline
+
+
+def write_status(c, start, end, st, noise):
+    try:
+        tmp = STATUS + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump({"ts": time.time(), "config": c["name"], "proto": c["proto"], "freq": c["freq"], "sf": c["sf"],
+                       "bw": c["bw"], "start": start, "end": end, "stats": st, "noise": noise[-1] if noise else None,
+                       "noise_hist": NOISE_HIST[-120:]}, f)
+        os.chmod(tmp, 0o644); os.replace(tmp, STATUS)
+    except OSError:
+        pass
 
 
 def main():
@@ -291,7 +305,7 @@ def main():
                     break
                 r.configure(c)
                 start = time.time(); end = start + c["dwell"]
-                st = dict(packets=0, crc=0, hdr_err=0, pre=0, hdr=0); noise = []; last_n = 0
+                st = dict(packets=0, crc=0, hdr_err=0, pre=0, hdr=0); noise = []; last_n = time.time(); last_s = 0  # skip the settling sample
                 print(f"[{time.strftime('%H:%M:%S')}] listen {c['name']} {c['freq']}MHz SF{c['sf']} BW{c['bw']} sync 0x{c['sync']:02X} {c['dwell']}s", flush=True)
                 while RUNNING and time.time() < end:
                     irq = r.irq()
@@ -311,6 +325,9 @@ def main():
                         r.clear(irq & ~0x0002 & 0xFFFF)
                     if time.time() - last_n > 5:
                         noise.append(r.rssi_inst()); last_n = time.time()
+                        NOISE_HIST.append((round(last_n, 1), noise[-1], c["name"])); del NOISE_HIST[:-240]
+                    if time.time() - last_s > 1:
+                        write_status(c, start, end, st, noise); last_s = time.time()
                     time.sleep(0.005)
                 db.execute("INSERT INTO dwells(config,start,end,packets,crc_errors,header_errors,preambles,headers,noise_dbm) "
                            "VALUES(?,?,?,?,?,?,?,?,?)", (c["name"], start, time.time(), st["packets"], st["crc"], st["hdr_err"],
