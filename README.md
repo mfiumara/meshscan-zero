@@ -31,7 +31,7 @@ So meshscan hops between presets, saves everything it hears to SQLite, and shows
 On the CardputerZero (Raspberry Pi OS trixie):
 
 ```sh
-git clone https://github.com/<owner>/meshscan-zero && cd meshscan-zero
+git clone https://github.com/mfiumara/meshscan-zero && cd meshscan-zero
 sudo ./install.sh
 ```
 
@@ -54,4 +54,4 @@ This is a weekend-afternoon tool, tested on one CardputerZero v5 in Amsterdam.
 
 ## License
 
-TBD
+GPL-3.0. See [LICENSE](LICENSE). meshscan uses the GPL-3.0 `meshtastic` Python package for its protobuf definitions.
