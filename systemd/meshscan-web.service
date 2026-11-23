@@ -1,0 +1,11 @@
+[Unit]
+Description=meshscan web dashboard (read-only, port 8080)
+After=network.target meshscan.service
+
+[Service]
+User=pi
+ExecStart=/usr/bin/python3 /opt/meshscan/meshscan-web.py
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

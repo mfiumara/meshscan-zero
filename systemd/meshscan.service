@@ -1,0 +1,12 @@
+[Unit]
+Description=meshscan receive-only LoRa scanner (Meshtastic/MeshCore/raw)
+After=network.target
+Conflicts=meshtasticd.service
+
+[Service]
+ExecStart=/opt/meshscan/venv/bin/python -u /opt/meshscan/meshscan.py
+Restart=on-failure
+RestartSec=20
+
+[Install]
+WantedBy=multi-user.target
