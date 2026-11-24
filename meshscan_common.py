@@ -40,7 +40,7 @@ REGIONS = {
                  LORAWAN_EU],
     },
     "eu_narrow": {
-        "label": "EU / UK", "detail": "MeshCore EU/UK Narrow · 869.618 MHz · SF8 · 62.5 kHz",
+        "label": "EU / UK", "detail": "EU/UK Narrow · 869.618 MHz · SF8 · 62.5 kHz",
         "radio": {"frequency_hz": 869_618_000, "bandwidth_hz": 62_500, "spreading_factor": 8, "coding_rate": 8},
         "chat_config": "meshcore_eu_narrow_sf8", "scopes": [], "default_scope": "",
         "scan": [_mc("meshcore_eu_narrow_sf8", 869.618, 8, 62.5, 600), _mt("meshtastic_longfast", 869.525, 11, 600),
