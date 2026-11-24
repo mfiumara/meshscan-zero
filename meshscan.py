@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""meshscan: receive-only LoRa scanner for CardputerZero + Cap LoRa-1262 (SX1262).
+"""meshscan: LoRa radio service for CardputerZero + Cap LoRa-1262 (SX1262).
 
-Hops through LoRa configs (raw LoRaWAN sanity, Meshtastic, MeshCore), logs every
-packet to SQLite, decodes Meshtastic (default key) and MeshCore (adverts, Public
-channel) and keeps a node database. Never transmits.
+Scan mode hops through LoRa presets (MeshCore, Meshtastic, LoRaWAN) and never transmits.
+Chat mode (meshscan_chat.py) runs a MeshCore node that only transmits what you send from
+the dashboard. Both decode every packet into SQLite (Meshtastic default channel, MeshCore
+adverts and Public channel) and keep a node database. Until the first-run setup is done
+the service stays in Scan mode.
 """
 import base64, hashlib, hmac, json, os, signal, sqlite3, struct, sys, time
 from pathlib import Path
@@ -12,16 +14,10 @@ import gpiod, smbus2, spidev
 from gpiod.line import Direction, Value
 
 DB = os.environ.get("MESHSCAN_DB", "/var/lib/meshscan/meshscan.db")
-CFG = os.environ.get("MESHSCAN_CFG", "/etc/meshscan.json")
 
-DEFAULT_CONFIGS = [
-    # name, proto, MHz, SF, BW code, sync, dwell s
-    {"name": "meshcore_nl_sf7", "proto": "meshcore", "freq": 869.618, "sf": 7, "bw": 62.5, "sync": 0x12, "dwell": 600},
-    {"name": "meshtastic_longfast", "proto": "meshtastic", "freq": 869.525, "sf": 11, "bw": 250, "sync": 0x2B, "dwell": 600},
-    {"name": "meshtastic_mediumfast", "proto": "meshtastic", "freq": 869.525, "sf": 9, "bw": 250, "sync": 0x2B, "dwell": 300},
-    {"name": "meshcore_eu_narrow_sf8", "proto": "meshcore", "freq": 869.618, "sf": 8, "bw": 62.5, "sync": 0x12, "dwell": 180},
-    {"name": "raw_lorawan_868.1_sf7", "proto": "raw", "freq": 868.1, "sf": 7, "bw": 125, "sync": 0x34, "dwell": 120},
-]
+import meshscan_common as common
+
+CONFIG_LABELS = common.CONFIG_LABELS
 BW_CODE = {7.8: 0x00, 10.4: 0x08, 15.6: 0x01, 20.8: 0x09, 31.25: 0x02, 41.7: 0x0A, 62.5: 0x03, 125: 0x04, 250: 0x05, 500: 0x06}
 
 # Meshtastic default channel key ("AQ==") and MeshCore Public channel key
@@ -87,7 +83,8 @@ class SX1262:
         self.cmd(0x9D, 0x01)                       # DIO2 as RF switch
         self.cmd(0x96, 0x01)                       # DC-DC
         self.cmd(0x8A, 0x01)                       # packet type LoRa
-        self.cmd(0x98, 0xD7, 0xDB); time.sleep(0.01)  # image cal 863-870
+        # image calibration for the band in use: 863-870 MHz or 902-928 MHz
+        self.cmd(0x98, *((0xE1, 0xE9) if c["freq"] > 900 else (0xD7, 0xDB))); time.sleep(0.01)
         f = int(c["freq"] * 1e6 * (1 << 25) / 32e6)
         self.cmd(0x86, (f >> 24) & 255, (f >> 16) & 255, (f >> 8) & 255, f & 255)
         self.cmd(0x8F, 0, 0)                       # buffer base
@@ -330,18 +327,28 @@ def write_status(c, start, end, st, noise):
 
 
 def load_config():
-    cfg = json.load(open(CFG)) if os.path.exists(CFG) else {}
-    configs = cfg.get("configs") or DEFAULT_CONFIGS
-    for c in configs:
+    cfg = common.radio_config(common.load_settings())
+    for c in cfg["configs"]:
         c["sync"] = int(c["sync"], 16) if isinstance(c["sync"], str) else c["sync"]
-    cfg["configs"] = configs
     return cfg
 
 
 def mode_reader(cfg):
-    default = cfg.get("default_mode", "chat")
+    """'chat' | 'scan' from the dashboard's mode file, or 'reload' once the settings change."""
+    default = cfg.get("default_mode", "scan")
+
+    def mtime():
+        try:
+            return os.stat(common.SETTINGS).st_mtime
+        except OSError:
+            return None
+    started_with = mtime()
 
     def mode_of():
+        if mtime() != started_with:
+            return "reload"           # systemd restarts us with the new settings
+        if not cfg.get("configured"):
+            return "scan"             # never transmit before the first-run setup
         try:
             m = (CTL / "mode").read_text().strip()
             return m if m in ("chat", "scan") else default

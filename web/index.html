@@ -207,6 +207,56 @@ tbody tr:hover{background:rgba(255,255,255,.025)}
 .send[disabled]{opacity:.3;cursor:not-allowed}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:rgba(20,12,16,.96);border:1px solid rgba(255,107,129,.4);color:#ffd5dc;padding:10px 16px;border-radius:12px;font-size:13px;z-index:50;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.on{opacity:1}
+/* header buttons */
+.iconbtn{all:unset;cursor:pointer;height:32px;padding:0 12px;border-radius:999px;display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);background:rgba(255,255,255,.03);border:1px solid var(--line)}
+.iconbtn:hover{color:var(--text);border-color:var(--line-2)}
+.iconbtn.ok{color:var(--mt);border-color:rgba(79,220,152,.3)}
+/* modals */
+.back{position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(3,5,8,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.back.on{display:flex;animation:fade .18s ease}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.modal{width:min(480px,100%);max-height:calc(100vh - 40px);overflow:auto;background:linear-gradient(180deg,#131a24,#0c1118);border:1px solid var(--line-2);border-radius:18px;box-shadow:0 40px 80px -20px rgba(0,0,0,.8);padding:28px}
+.modal.sm{width:min(360px,100%)}
+.modal h2{margin:0;font-size:20px;font-weight:650;letter-spacing:-.02em}
+.modal .lead{color:var(--muted);margin:6px 0 22px;line-height:1.5}
+.steps{display:flex;gap:6px;margin-bottom:22px}
+.steps i{flex:1;height:3px;border-radius:3px;background:rgba(255,255,255,.08)}
+.steps i.on{background:linear-gradient(90deg,var(--mc),var(--mt))}
+.fld{display:block;margin-bottom:16px}
+.fld>span{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:500}
+.fld small{display:block;color:var(--dim);font-size:12px;margin-top:6px;line-height:1.45}
+.in{all:unset;box-sizing:border-box;width:100%;height:42px;padding:0 13px;border-radius:11px;background:rgba(255,255,255,.04);border:1px solid var(--line);font-size:14px;color:var(--text)}
+.in:focus{border-color:rgba(94,177,255,.55);box-shadow:0 0 0 3px rgba(94,177,255,.12)}
+select.in{appearance:none;line-height:40px;padding-right:34px;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 18px) 18px,calc(100% - 13px) 18px;background-size:5px 5px;background-repeat:no-repeat}
+select.in option{background:#0d1117}
+.in.pin{text-align:center;font:600 24px/42px var(--mono);letter-spacing:.5em;height:56px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.choice{display:grid;gap:8px;margin-bottom:16px}
+.opt{cursor:pointer;display:grid;grid-template-columns:18px 1fr;gap:12px;align-items:start;padding:13px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.02);transition:border-color .15s,background .15s}
+.opt:hover{border-color:var(--line-2)}
+.opt.on{border-color:rgba(94,177,255,.55);background:rgba(94,177,255,.07)}
+.opt .rd{width:16px;height:16px;border-radius:50%;border:2px solid var(--dim);margin-top:1px;box-sizing:border-box}
+.opt.on .rd{border:5px solid var(--mc)}
+.opt b{display:block;font-weight:600}
+.opt span{display:block;color:var(--dim);font-size:12px;margin-top:2px;font-family:var(--mono)}
+.opt span.p{font-family:inherit;font-size:12.5px;color:var(--muted)}
+.acts{display:flex;gap:10px;margin-top:22px;align-items:center}
+.btn{all:unset;cursor:pointer;height:42px;padding:0 18px;border-radius:11px;display:inline-flex;align-items:center;justify-content:center;font-weight:600;font-size:13.5px;background:rgba(255,255,255,.06);color:var(--text);border:1px solid var(--line)}
+.btn:hover{background:rgba(255,255,255,.09)}
+.btn.pri{background:linear-gradient(180deg,#6dbaff,#4a9ef0);color:#04121f;border-color:transparent}
+.btn.pri:hover{filter:brightness(1.07)}
+.btn[disabled]{opacity:.4;pointer-events:none}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+.err{color:var(--bad);font-size:12.5px;min-height:18px;margin-top:4px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.chipx{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 6px 0 10px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--line);font-size:12.5px}
+.chipx button{all:unset;cursor:pointer;width:18px;height:18px;border-radius:5px;display:grid;place-items:center;color:var(--dim)}
+.chipx button:hover{background:rgba(255,255,255,.08);color:var(--text)}
+.row2{display:flex;gap:8px}
+.row2 .in{flex:1}
+details.more summary{cursor:pointer;color:var(--muted);font-size:12.5px;margin:4px 0 12px}
+hr.sep{border:0;border-top:1px solid var(--line);margin:20px 0}
+.lockicon{display:grid;place-items:center;width:52px;height:52px;border-radius:16px;margin:0 auto 14px;background:rgba(94,177,255,.1);border:1px solid rgba(94,177,255,.25)}
 footer{color:var(--dim);font-size:12px;text-align:center;margin-top:8px}
 footer a{color:var(--muted);text-decoration:none}footer a:hover{color:var(--text)}
 
@@ -242,6 +292,8 @@ footer a{color:var(--muted);text-decoration:none}footer a:hover{color:var(--text
   <div class="spacer"></div>
   <span class="pill clock num" id="clock">--:--:--</span>
   <div class="modeseg" id="modeseg"><button data-m="chat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v11H8l-4 4z"/></svg>Chat</button><button data-m="scan"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h3l3-8 4 16 3-8h7"/></svg>Scan</button></div>
+  <button class="iconbtn" id="lockbtn" title="Unlock to send and change settings"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path id="lockpath" d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span id="locktxt">Locked</span></button>
+  <button class="iconbtn" id="gearbtn" title="Settings" style="padding:0 9px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
   <span class="pill live off" id="live"><span class="dot"></span><b>CONNECTING</b></span>
 </header>
 
@@ -312,6 +364,63 @@ footer a{color:var(--muted);text-decoration:none}footer a:hover{color:var(--text
   </div>
 </section>
 <div class="toast" id="toast"></div>
+
+<div class="back" id="setup"><div class="modal">
+  <div class="steps" id="stepbar"><i></i><i></i><i></i><i></i></div>
+  <div data-step="0">
+    <h2>Welcome to meshscan</h2>
+    <p class="lead">Four quick questions and your Cardputer is a mesh node. You can change all of this later in Settings.</p>
+    <label class="fld"><span>Node name</span><input class="in" id="su-name" maxlength="24" autocomplete="off"><small>Shown next to every message you send, e.g. “mfiumara”. No colons.</small></label>
+  </div>
+  <div data-step="1" hidden>
+    <h2>Where are you?</h2>
+    <p class="lead">Nodes only hear each other on the same radio settings, and those are agreed per region.</p>
+    <div class="choice" id="su-regions"></div>
+    <label class="fld" id="su-scopewrap"><span>Region tag</span><select class="in" id="su-scopesel"></select><input class="in" id="su-scopein" placeholder="leave empty if unsure" maxlength="30" autocomplete="off"><small id="su-scopehelp"></small></label>
+  </div>
+  <div data-step="2" hidden>
+    <h2>Pick a PIN</h2>
+    <p class="lead">Anyone on your network can watch the dashboard. Sending messages, switching modes and changing settings need this PIN.</p>
+    <div class="two"><label class="fld"><span>PIN (4–8 digits)</span><input class="in pin" id="su-pin" type="password" inputmode="numeric" maxlength="8" autocomplete="new-password"></label>
+    <label class="fld"><span>Repeat PIN</span><input class="in pin" id="su-pin2" type="password" inputmode="numeric" maxlength="8" autocomplete="new-password"></label></div>
+  </div>
+  <div data-step="3" hidden>
+    <h2>How should it start?</h2>
+    <p class="lead">You can switch any time from the header.</p>
+    <div class="choice" id="su-modes">
+      <div class="opt on" data-v="chat"><span class="rd"></span><div><b>Chat</b><span class="p">Join the mesh: read and send on the Public channel. Transmits when you send.</span></div></div>
+      <div class="opt" data-v="scan"><span class="rd"></span><div><b>Scan</b><span class="p">Listen only. Hops between MeshCore, Meshtastic and LoRaWAN presets and maps what's around.</span></div></div>
+    </div>
+    <details class="more"><summary>Home location for the radar (optional)</summary>
+      <div class="two"><input class="in" id="su-lat" placeholder="Latitude, e.g. 52.37" inputmode="decimal"><input class="in" id="su-lon" placeholder="Longitude, e.g. 4.89" inputmode="decimal"></div>
+      <small style="display:block;color:var(--dim);font-size:12px;margin-top:6px">Lets the Cardputer radar place nodes by real bearing and distance.</small></details>
+  </div>
+  <div class="err" id="su-err"></div>
+  <div class="acts"><button class="btn ghost" id="su-back">Back</button><span class="spacer"></span><button class="btn pri" id="su-next">Continue</button></div>
+</div></div>
+
+<div class="back" id="unlock"><div class="modal sm" style="text-align:center">
+  <div class="lockicon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5eb1ff" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+  <h2>Unlock</h2><p class="lead" style="margin-bottom:18px">Enter the PIN to send, switch modes and change settings.</p>
+  <form id="unlockform" autocomplete="off"><input class="in pin" id="un-pin" type="password" inputmode="numeric" maxlength="8" autocomplete="current-password">
+  <div class="err" id="un-err"></div>
+  <div class="acts" style="justify-content:center"><button class="btn ghost" type="button" id="un-cancel">Cancel</button><button class="btn pri" type="submit">Unlock</button></div></form>
+</div></div>
+
+<div class="back" id="settingsm"><div class="modal">
+  <h2>Settings</h2><p class="lead">Saving restarts the radio (about 10 seconds).</p>
+  <label class="fld"><span>Node name</span><input class="in" id="st-name" maxlength="24" autocomplete="off"></label>
+  <label class="fld"><span>Region</span><select class="in" id="st-region"></select><small id="st-regiondetail"></small></label>
+  <label class="fld"><span>Region tag</span><select class="in" id="st-scopesel"></select><input class="in" id="st-scopein" placeholder="leave empty if unsure" maxlength="30" autocomplete="off"></label>
+  <div class="fld"><span>Channels</span><div class="chips" id="st-chips"></div>
+    <div class="row2"><input class="in" id="st-hash" placeholder="#hashtag channel" autocomplete="off"><button class="btn" id="st-addhash" type="button">Add</button></div>
+    <details class="more" style="margin-top:8px"><summary>Add a private channel</summary><div class="row2"><input class="in" id="st-pname" placeholder="Name" autocomplete="off"><input class="in" id="st-pkey" placeholder="Key (base64)" autocomplete="off"><button class="btn" id="st-addpriv" type="button">Add</button></div></details></div>
+  <div class="fld"><span>Start in</span><div class="seg" id="st-mode" style="height:36px"><button data-v="chat">Chat</button><button data-v="scan">Scan</button></div></div>
+  <div class="fld"><span>Home location (radar)</span><div class="two"><input class="in" id="st-lat" placeholder="Latitude" inputmode="decimal"><input class="in" id="st-lon" placeholder="Longitude" inputmode="decimal"></div></div>
+  <label class="fld"><span>New PIN (leave empty to keep)</span><input class="in" id="st-pin" type="password" inputmode="numeric" maxlength="8" autocomplete="new-password"></label>
+  <div class="err" id="st-err"></div>
+  <div class="acts"><button class="btn ghost" id="st-lock" type="button">Lock this browser</button><span class="spacer"></span><button class="btn" id="st-cancel" type="button">Cancel</button><button class="btn pri" id="st-save" type="button">Save</button></div>
+</div></div>
 <footer>meshscan transmits only what you send from Chat · <a href="https://github.com/mfiumara/meshscan-zero">github.com/mfiumara/meshscan-zero</a></footer>
 </div>
 
@@ -323,7 +432,7 @@ const now=()=>Date.now()/1000;
 const ago=t=>{if(!t)return'–';const s=Math.max(0,now()-t);return s<60?Math.round(s)+'s':s<3600?Math.round(s/60)+'m':s<86400?Math.round(s/3600)+'h':Math.round(s/86400)+'d'};
 const HEX={meshcore:'#5eb1ff',meshtastic:'#4fdc98',raw:'#b996ff'};
 const TYPE={ADVERT:'#5eb1ff',GRP_TXT:'#b996ff',TXT_MSG:'#ff9ed2',REQ:'#ffb86b',RESPONSE:'#ffd479',PATH:'#7ee0e8',ACK:'#8b94a3',TRACE:'#7ee0e8',ANON_REQ:'#ffb86b',CONTROL:'#8b94a3',MULTIPART:'#8b94a3'};
-const PRETTY={meshcore_nl_sf7:'MeshCore NL',meshtastic_longfast:'Meshtastic LongFast',meshtastic_mediumfast:'Meshtastic MediumFast',meshcore_eu_narrow_sf8:'MeshCore EU Narrow','raw_lorawan_868.1_sf7':'LoRaWAN 868.1'};
+const PRETTY={meshcore_us_sf7:'MeshCore US',meshtastic_us_longfast:'Meshtastic US LongFast',meshcore_nl_sf7:'MeshCore NL',meshtastic_longfast:'Meshtastic LongFast',meshtastic_mediumfast:'Meshtastic MediumFast',meshcore_eu_narrow_sf8:'MeshCore EU/UK Narrow','raw_lorawan_868.1_sf7':'LoRaWAN 868.1'};
 const pretty=c=>PRETTY[c]||c;
 const protoOf=c=>c.startsWith('meshcore')?'meshcore':c.startsWith('meshtastic')?'meshtastic':'raw';
 const sig=(snr,c)=>{const n=snr==null?0:snr>=5?4:snr>=0?3:snr>=-7?2:snr>=-13?1:0;return `<span class="sig" style="--c:${c}">${[1,2,3,4].map(i=>`<i class="${i<=n?'on':''}"></i>`).join('')}</span>`};
@@ -484,20 +593,96 @@ function renderChat(){
   $('#thread').innerHTML=html||`<div class="empty">No messages on #${esc(CH)} yet.</div>`;
   if(near||stickNext){body.scrollTop=body.scrollHeight;stickNext=false}
   renderComposer()}
-function renderComposer(){const idx=chanIdx(),on=MODE==='chat'&&idx!=null;const inp=$('#msgin');
-  inp.disabled=!on;inp.placeholder=MODE!=='chat'?'Switch to Chat mode to send':idx==null?`#${CH} is receive-only here`:`Message #${CH} as ${ST?.node?.name||''}`;
+function renderComposer(){const idx=chanIdx(),cfg=SETTINGS?.configured,on=cfg&&MODE==='chat'&&idx!=null;const inp=$('#msgin');
+  inp.disabled=!on;inp.readOnly=on&&!UNLOCKED;
+  inp.placeholder=!cfg?'Finish setup to send':MODE!=='chat'?'Switch to Chat mode to send':idx==null?`#${CH} is receive-only here`:!UNLOCKED?'Unlock to send':`Message #${CH} as ${ST?.node?.name||''}`;
   const n=new TextEncoder().encode(inp.value).length;$('#msgcnt').textContent=n+'/140';$('#msgcnt').classList.toggle('over',n>140);
-  $('#sendbtn').disabled=!on||!inp.value.trim()||n>140;
-  $('#whochip').textContent=MODE==='chat'&&ST?.node?`${ST.node.name} · #${ST.node.scope}`:''}
+  $('#sendbtn').disabled=!on||!UNLOCKED||!inp.value.trim()||n>140;
+  $('#whochip').textContent=MODE==='chat'&&ST?.node?`${ST.node.name} · ${ST.node.scope?'#'+ST.node.scope:'no region tag'}`:''}
 $('#msgin').addEventListener('input',renderComposer);
-function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('on');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('on'),3500)}
-$('#composer').addEventListener('submit',async e=>{e.preventDefault();const inp=$('#msgin'),text=inp.value.trim(),idx=chanIdx();if(!text||idx==null)return;
-  $('#sendbtn').disabled=true;
-  try{const r=await fetch('/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,channel:idx})});const o=await r.json();
-    if(!r.ok)throw new Error(o.error||r.status);inp.value='';stickNext=true}catch(err){toast('Not sent: '+err.message)}renderComposer()});
+$('#msgin').addEventListener('focus',()=>{if(!UNLOCKED&&!$('#msgin').disabled)requireUnlock(()=>$('#msgin').focus())});
+function toast(t,ok){const el=$('#toast');el.textContent=t;el.style.borderColor=ok?'rgba(79,220,152,.4)':'';el.style.color=ok?'#d6ffe9':'';el.style.background=ok?'rgba(10,22,16,.96)':'';el.classList.add('on');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('on'),3500)}
+async function post(url,body){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});
+  const o=await r.json().catch(()=>({}));if(r.status===401&&url!=='/api/login'){UNLOCKED=false;renderLock()}
+  if(!r.ok){const e=new Error(o.error||('HTTP '+r.status));e.status=r.status;throw e}return o}
+$('#composer').addEventListener('submit',e=>{e.preventDefault();requireUnlock(async()=>{const inp=$('#msgin'),text=inp.value.trim(),idx=chanIdx();if(!text||idx==null)return;
+  $('#sendbtn').disabled=true;try{await post('/api/send',{text,channel:idx});inp.value='';stickNext=true}catch(err){toast('Not sent: '+err.message)}renderComposer()})});
 function renderMode(){document.querySelectorAll('#modeseg button').forEach(b=>{b.classList.toggle('on',b.dataset.m===MODE);b.classList.toggle('pending',wantMode&&b.dataset.m===wantMode&&wantMode!==MODE)});if(wantMode===MODE)wantMode=null;renderComposer()}
-$('#modeseg').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b||b.dataset.m===MODE)return;wantMode=b.dataset.m;renderMode();
-  try{const r=await fetch('/api/mode',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:wantMode})});if(!r.ok)throw new Error((await r.json()).error)}catch(err){wantMode=null;renderMode();toast('Mode switch failed: '+err.message)}});
+$('#modeseg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.m===MODE)return;
+  if(!SETTINGS?.configured)return openSetup();
+  requireUnlock(async()=>{wantMode=b.dataset.m;renderMode();try{await post('/api/mode',{mode:wantMode})}catch(err){wantMode=null;renderMode();toast('Mode switch failed: '+err.message)}})});
+
+/* ---------------- modals, lock, setup, settings ---------------- */
+let SETTINGS=null,UNLOCKED=false,pending=null;
+const open_=id=>{$('#'+id).classList.add('on')},close_=id=>{$('#'+id).classList.remove('on')};
+function renderLock(){$('#locktxt').textContent=UNLOCKED?'Unlocked':'Locked';$('#lockbtn').classList.toggle('ok',UNLOCKED);
+  $('#lockpath').setAttribute('d',UNLOCKED?'M8 11V7a4 4 0 0 1 7.5-2':'M8 11V7a4 4 0 0 1 8 0v4');
+  $('#lockbtn').style.display=SETTINGS?.configured?'':'none';renderComposer()}
+function requireUnlock(fn){if(UNLOCKED)return fn();if(!SETTINGS?.configured)return openSetup();pending=fn;$('#un-err').textContent='';$('#un-pin').value='';open_('unlock');setTimeout(()=>$('#un-pin').focus(),50)}
+$('#unlockform').addEventListener('submit',async e=>{e.preventDefault();try{await post('/api/login',{pin:$('#un-pin').value});UNLOCKED=true;close_('unlock');renderLock();const f=pending;pending=null;f&&f()}
+  catch(err){$('#un-err').textContent=err.message;$('#un-pin').select()}});
+$('#un-cancel').onclick=()=>{pending=null;close_('unlock')};
+$('#lockbtn').onclick=()=>UNLOCKED?openSettings():requireUnlock(()=>toast('Unlocked',true));
+$('#gearbtn').onclick=()=>SETTINGS?.configured?requireUnlock(openSettings):openSetup();
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){for(const id of ['unlock','settingsm'])close_(id);pending=null}});
+async function loadSettings(){SETTINGS=await j('/api/settings');renderLock();if(!SETTINGS.configured&&!SETTINGS.legacy)openSetup();renderHome()}
+async function loadSession(){UNLOCKED=(await j('/api/session')).unlocked;renderLock()}
+
+function scopeUI(prefix,regionKey,value){const r=SETTINGS.regions[regionKey],sel=$(`#${prefix}-scopesel`),inp=$(`#${prefix}-scopein`);
+  if(r.scopes.length){sel.style.display='';inp.style.display='none';sel.innerHTML=r.scopes.map(([v,l])=>`<option value="${v}">${esc(l)} (#${v})</option>`).join('');sel.value=r.scopes.some(([v])=>v===value)?value:r.default_scope}
+  else{sel.style.display='none';inp.style.display='';inp.value=value||''}
+  const help=$(`#${prefix}-scopehelp`);if(help)help.textContent=r.scopes.length?'Dutch repeaters only forward messages tagged with a region. Your province keeps traffic local; “Whole country” reaches further.':'Some meshes tag messages with a region (e.g. de-hh). Leave empty unless your community uses one.'}
+const scopeVal=prefix=>{const sel=$(`#${prefix}-scopesel`);return sel.style.display==='none'?$(`#${prefix}-scopein`).value.trim():sel.value};
+function homeVal(prefix){const la=$(`#${prefix}-lat`).value.trim(),lo=$(`#${prefix}-lon`).value.trim();if(!la&&!lo)return null;return{lat:la,lon:lo}}
+
+/* setup wizard */
+let step=0,suRegion='nl',suMode='chat';
+function openSetup(){if(!SETTINGS||SETTINGS.configured)return;step=0;$('#su-name').value=$('#su-name').value||(SETTINGS.suggested_name||'').replace(/\.local$/,'').slice(0,24);
+  $('#su-regions').innerHTML=Object.entries(SETTINGS.regions).map(([k,r])=>`<div class="opt ${k===suRegion?'on':''}" data-v="${k}"><span class="rd"></span><div><b>${esc(r.label)}</b><span>${esc(r.detail)}</span></div></div>`).join('');
+  scopeUI('su',suRegion,SETTINGS.regions[suRegion].default_scope);renderStep();open_('setup');setTimeout(()=>$('#su-name').focus(),50)}
+function renderStep(){document.querySelectorAll('#setup [data-step]').forEach(el=>el.hidden=+el.dataset.step!==step);
+  document.querySelectorAll('#stepbar i').forEach((el,i)=>el.classList.toggle('on',i<=step));
+  $('#su-back').style.visibility=step?'visible':'hidden';$('#su-next').textContent=step===3?'Start meshscan':'Continue';$('#su-err').textContent=''}
+$('#su-regions').addEventListener('click',e=>{const o=e.target.closest('.opt');if(!o)return;suRegion=o.dataset.v;document.querySelectorAll('#su-regions .opt').forEach(x=>x.classList.toggle('on',x===o));scopeUI('su',suRegion,SETTINGS.regions[suRegion].default_scope)});
+$('#su-modes').addEventListener('click',e=>{const o=e.target.closest('.opt');if(!o)return;suMode=o.dataset.v;document.querySelectorAll('#su-modes .opt').forEach(x=>x.classList.toggle('on',x===o))});
+$('#su-back').onclick=()=>{step=Math.max(0,step-1);renderStep()};
+$('#su-next').onclick=async()=>{const err=$('#su-err');
+  if(step===0){const n=$('#su-name').value.trim();if(!n||n.length>24||n.includes(':')){err.textContent='Name: 1–24 characters, no colons.';return}}
+  if(step===2){const a=$('#su-pin').value,b=$('#su-pin2').value;if(!/^\d{4,8}$/.test(a)){err.textContent='PIN must be 4–8 digits.';return}if(a!==b){err.textContent='The PINs don’t match.';return}}
+  if(step<3){step++;renderStep();return}
+  $('#su-next').disabled=true;
+  try{await post('/api/setup',{name:$('#su-name').value.trim(),region:suRegion,scope:scopeVal('su'),pin:$('#su-pin').value,default_mode:suMode,home:homeVal('su')});
+    UNLOCKED=true;close_('setup');await loadSettings();toast(suMode==='chat'?'All set. Joining the mesh…':'All set. Scanning…',true)}
+  catch(e2){err.textContent=e2.message}finally{$('#su-next').disabled=false}};
+document.querySelectorAll('#setup .in').forEach(el=>el.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('#su-next').click()}}));
+
+/* settings */
+let stChans=[],stMode='scan';
+function chipsUI(){$('#st-chips').innerHTML=[{name:'Public',fixed:true},...stChans].map((c,i)=>`<span class="chipx">${c.private||c.psk?'🔒 ':''}${esc(c.name)}${c.fixed?'<span style="width:6px"></span>':`<button type="button" data-i="${i-1}" title="Remove">✕</button>`}</span>`).join('')}
+function openSettings(){const S=SETTINGS;$('#st-name').value=S.name;$('#st-region').innerHTML=Object.entries(S.regions).map(([k,r])=>`<option value="${k}">${esc(r.label)}</option>`).join('');
+  $('#st-region').value=S.region;$('#st-regiondetail').textContent=S.regions[S.region].detail;scopeUI('st',S.region,S.scope);
+  stChans=S.channels.map(c=>({name:c.name,private:c.private,keep_psk:c.private}));chipsUI();stMode=S.default_mode;
+  document.querySelectorAll('#st-mode button').forEach(b=>b.classList.toggle('on',b.dataset.v===stMode));
+  $('#st-lat').value=S.home?.lat??'';$('#st-lon').value=S.home?.lon??'';$('#st-pin').value='';$('#st-err').textContent='';open_('settingsm')}
+$('#st-region').onchange=e=>{const k=e.target.value;$('#st-regiondetail').textContent=SETTINGS.regions[k].detail;scopeUI('st',k,SETTINGS.regions[k].default_scope)};
+$('#st-chips').addEventListener('click',e=>{const b=e.target.closest('button[data-i]');if(b){stChans.splice(+b.dataset.i,1);chipsUI()}});
+$('#st-addhash').onclick=()=>{let n=$('#st-hash').value.trim();if(!n)return;if(!n.startsWith('#'))n='#'+n;if(stChans.some(c=>c.name===n))return;stChans.push({name:n});$('#st-hash').value='';chipsUI()};
+$('#st-addpriv').onclick=()=>{const n=$('#st-pname').value.trim(),k=$('#st-pkey').value.trim();if(!n||!k)return;stChans.push({name:n,psk:k});$('#st-pname').value=$('#st-pkey').value='';chipsUI()};
+$('#st-mode').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;stMode=b.dataset.v;document.querySelectorAll('#st-mode button').forEach(x=>x.classList.toggle('on',x===b))});
+$('#st-cancel').onclick=()=>close_('settingsm');
+$('#st-lock').onclick=async()=>{await post('/api/logout');UNLOCKED=false;renderLock();close_('settingsm');toast('Locked',true)};
+$('#st-save').onclick=async()=>{const err=$('#st-err');err.textContent='';$('#st-save').disabled=true;
+  try{await post('/api/settings',{name:$('#st-name').value.trim(),region:$('#st-region').value,scope:scopeVal('st'),default_mode:stMode,
+      channels:stChans.map(c=>c.psk?{name:c.name,psk:c.psk}:c.keep_psk?{name:c.name,keep_psk:true}:{name:c.name}),home:homeVal('st'),new_pin:$('#st-pin').value});
+    close_('settingsm');await loadSettings();toast('Saved. Radio restarting…',true)}
+  catch(e2){if(e2.status===401){close_('settingsm');requireUnlock(openSettings)}else err.textContent=e2.message}finally{$('#st-save').disabled=false}};
+
+/* home marker on the map */
+function renderHome(){mapReady.then(()=>{const h=SETTINGS?.home;const d=h?fc([{type:'Feature',geometry:{type:'Point',coordinates:[+h.lon,+h.lat]},properties:{}}]):fc([]);
+  if(!map.getSource('home')){map.addSource('home',{type:'geojson',data:d});
+    map.addLayer({id:'home-ring',type:'circle',source:'home',paint:{'circle-radius':14,'circle-color':'transparent','circle-stroke-color':'#e8ecf2','circle-stroke-width':1.2,'circle-stroke-opacity':.5}});
+    map.addLayer({id:'home-dot',type:'circle',source:'home',paint:{'circle-radius':4,'circle-color':'#e8ecf2'}})}
+  else map.getSource('home').setData(d)})}
 
 /* ---------------- live stream ---------------- */
 let es,refreshT,sideT,lastPkt=0;
@@ -515,7 +700,7 @@ setInterval(()=>{document.querySelectorAll('.ago-c').forEach(el=>el.textContent=
   $('#feedsub').textContent=lastPkt?`last packet ${ago(lastPkt)} ago`:'';
   $('#clock').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'})},1000);
 setInterval(()=>{loadSide();loadSummary()},60000);
-(async()=>{await Promise.all([loadSummary(),loadFeed(),loadSide(),j('/api/status').then(s=>{ST=s;renderStatus()})]);
+(async()=>{await Promise.all([loadSettings(),loadSession(),loadSummary(),loadFeed(),loadSide(),j('/api/status').then(s=>{ST=s;renderStatus()})]);
   await loadNodes();connect()})();
 </script>
 </body>

@@ -4,8 +4,6 @@ After=network.target
 Conflicts=meshtasticd.service
 
 [Service]
-# MeshTerm's bundled site (openhop-core + pinned cffi/pycryptodome) for chat mode
-Environment=PYTHONPATH=/usr/lib/meshterm/site
 ExecStart=/opt/meshscan/venv/bin/python -u /opt/meshscan/meshscan.py
 Restart=always
 RestartSec=3

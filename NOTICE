@@ -1,0 +1,10 @@
+meshscan-zero
+Copyright (C) 2026 Mattia Fiumara. Licensed under the GNU General Public License v3.0 (see LICENSE).
+
+This product includes software adapted from MeshTerm (https://github.com/jpmartineau/MeshTerm),
+Copyright the MeshTerm authors, licensed under the Apache License, Version 2.0
+(see licenses/Apache-2.0.txt). Adapted file: meshscan_board.py (from meshterm/core/radionode.py).
+
+Runtime dependencies installed by install.sh (not bundled):
+  openhop-core (MIT), python-periphery (MIT), meshtastic (GPL-3.0), MapLibre GL JS (BSD-3-Clause, CDN),
+  OpenFreeMap tiles (OpenStreetMap data, ODbL).
