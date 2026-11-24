@@ -6,6 +6,10 @@ import json
 import threading
 import time
 import unittest
+import tempfile
+from pathlib import Path
+from PIL import Image
+import map_tiles
 from unittest.mock import patch
 
 import radar
@@ -22,15 +26,59 @@ class RadarTests(unittest.TestCase):
         self.assertNotIn('_', radar.preset_name('meshcore_future_sf12'))
         self.assertEqual(radar.clip('Mesh 🇳🇱 node', 100, radar.FONT), 'Mesh  node')
 
-    def test_position(self):
-        node = {'node_id': 'abc', 'last_rssi': -80}
-        self.assertEqual(radar.position(node, None), radar.position(node, None))
-        near = radar.position(node, None)
-        far = radar.position(dict(node, last_rssi=-120), None)
-        self.assertLess((near[0]-radar.CX)**2 + (near[1]-radar.CY)**2, (far[0]-radar.CX)**2 + (far[1]-radar.CY)**2)
-        north = radar.position(dict(node, lat=52.1, lon=5), {'lat': 52, 'lon': 5})
-        self.assertAlmostEqual(north[0], radar.CX, places=5)
-        self.assertLess(north[1], 85)
+    def test_projection_fit_and_age_filter(self):
+        lat, lon = 52.37, 4.89
+        x, y = map_tiles.project(lat, lon, 10)
+        actual_lat, actual_lon = map_tiles.unproject(x, y, 10)
+        self.assertAlmostEqual(lat, actual_lat)
+        self.assertAlmostEqual(lon, actual_lon)
+        now = time.time()
+        nodes = [{'lat':lat,'lon':lon,'last_seen':now}, {'lat':52.5,'lon':5.1,'last_seen':now-90000}, {'node_id':'no-gps','last_seen':now}]
+        self.assertEqual(len(radar.visible_nodes(nodes, False, now)), 1)
+        self.assertEqual(len(radar.visible_nodes(nodes, True, now)), 2)
+        self.assertIsNotNone(map_tiles.fit(nodes))
+        self.assertIsNone(map_tiles.fit([{'node_id':'no-gps'}]))
+
+    def test_home_does_not_preempt_initial_fit(self):
+        data = radar.Data.__new__(radar.Data)
+        data.lock = threading.Lock()
+        data.status, data.summary, data.nodes, data.hops, data.messages, data.settings = {}, {}, [], [], [], {}
+        data.online, data.events = False, []
+        with patch.dict(os.environ, {'RADAR_HOME':'52.37,4.89', 'MESH_MAP_OFFLINE':'1'}):
+            renderer = radar.Renderer()
+            renderer.render(data, time.monotonic(), False, 0, 'http://localhost:8080')
+            self.assertIsNone(renderer.view)
+            data.nodes = [{'lat':52.5,'lon':5.0,'node_id':'a','last_seen':time.time()}]
+            data.online = True
+            renderer.render(data, time.monotonic(), False, 0, 'http://localhost:8080')
+            self.assertEqual(renderer.view, map_tiles.fit(data.nodes))
+
+    def test_cardputer_zoom_keys(self):
+        renderer = radar.Renderer()
+        renderer.view = (1000, 1000, 6)
+        renderer.change_view(72)  # Sym+'+'
+        self.assertEqual(renderer.view, (2000, 2000, 7))
+        renderer.change_view(71)  # Sym+'-'
+        self.assertEqual(renderer.view, (1000, 1000, 6))
+        renderer.change_view(106)  # right arrow
+        self.assertEqual(renderer.view, (1040, 1000, 6))
+        renderer.home = {'lat': 52.37, 'lon': 4.89}
+        renderer.change_view(35)  # H
+        self.assertEqual(renderer.view, (*map_tiles.project(52.37, 4.89, 6), 6))
+        renderer.nodes = [{'lat':52.5,'lon':5.0,'node_id':'a','last_seen':time.time()}]
+        renderer.change_view(33)  # F
+        self.assertEqual(renderer.view, map_tiles.fit(renderer.nodes))
+
+    def test_offline_cached_tile_and_missing_tile(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {'MESH_MAP_OFFLINE':'1'}):
+            worker = map_tiles.TileWorker(tmp)
+            tile = Path(tmp)/'2'/'2'/'1.png'
+            tile.parent.mkdir(parents=True)
+            Image.new('RGB', (256,256), (5,55,80)).save(tile)
+            self.assertEqual(worker.tile(2,2,1).getpixel((10,10)), (5,55,80))
+            image, missing = worker.make_view((600,400,2))
+            self.assertGreater(missing, 0)
+            self.assertEqual(image.size, (190,170))
 
     def test_event_and_empty_render(self):
         data = radar.Data.__new__(radar.Data)

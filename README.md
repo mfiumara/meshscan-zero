@@ -35,7 +35,7 @@ Then open `http://cardputerzero.local:8080`. The first visit walks you through a
 1. **Node name**, shown next to every message you send.
 2. **Region:** Netherlands (MeshCore NL), EU/UK (Narrow) or USA/Canada, plus the region tag your floods carry. Dutch repeaters drop untagged floods, so pick your province (`#nl-nh`, `#nl-ut`, …) or the whole country.
 3. **PIN:** anyone on your network can watch the dashboard; sending, switching modes and changing settings need the PIN.
-4. **Start in Chat or Scan**, and optionally a home location for the on-device radar.
+4. **Start in Chat or Scan**, and optionally a home location for the on-device map.
 
 Until setup is done the radio stays in Scan mode and never transmits. Everything is changeable later under ⚙ Settings (saving restarts the radio, about 10 s), including extra `#hashtag` channels (key derived from the name) and private channels (base64 key).
 
@@ -59,20 +59,21 @@ The chat window has channel tabs, live messages and a composer. Your own message
 
 Your node doesn't send adverts, so it won't show up in other people's contact lists, but your name is in every message. While in chat mode the radio stays on one preset, so the other scan slots aren't visited.
 
-## On-device radar
+## On-device map
 
-The **Mesh Radar** launcher app shows a sweeping scope, live packet/node counts, signal and noise, and a QR link to the dashboard. Diamonds are repeaters/relays; dots are other nodes. With a configured home location, located nodes use bearing and log-scaled distance; otherwise the angle is stable but arbitrary and radius approximates signal strength. It reads only the local HTTP API and keeps retrying if the web service is unavailable.
+**Mesh Map** shows only nodes with advertised coordinates on a dark OpenFreeMap basemap. It fits located nodes heard in the last 24 hours; recent nodes glow, older nodes are dimmer, and nodes without GPS are counted rather than placed. RSSI is not shown as node signal: it can belong to the relay that forwarded an advert. The app reads only the local HTTP API and reconnects after outages.
 
-`install.sh` installs it too (or run `sudo ./device/install-radar.sh` on its own).
+`install.sh` installs it too (or run `sudo ./device/install-radar.sh` on its own). Open **Mesh Map** from APPLaunch. Arrows pan; **Sym + / = / -** zoom; **F** fits the last 24 hours; **H** centers on home if configured; **A** toggles older nodes; **Space/Tab** selects and centers a node. **Shift+Q** opens the dashboard QR, and **Esc/q** exits.
 
-Launch **Mesh Radar** from APPLaunch. **Shift+Q** toggles the full-screen dashboard QR; **Space** or **Tab** cycles nodes by signal strength; **Esc** or lowercase **q** exits. The dashboard URL is also visible in the QR view. The installer uses a separate venv under `/opt/meshscan-radar` and does not restart meshscan services. If the launcher has not refreshed its app list, restart the user `APPLaunch.service` or log in again.
+Tiles are fetched asynchronously from [OpenFreeMap](https://openfreemap.org/) (© OpenStreetMap contributors, © OpenMapTiles) and cached under `~/.cache/meshscan-map` for offline use. Uncached areas show a warning when offline. For diagnostics, `MESH_MAP_OFFLINE=1` disables tile fetching and `RADAR_HOME=52.37,4.89` overrides the home marker for that process only. Neither changes meshscan settings. The app uses its own venv under `/opt/meshscan-radar`; the bundled Inter and JetBrains Mono fonts have SIL Open Font licences in `device/fonts/`.
 
-For diagnostic runs, `RADAR_HOME=52.37,4.89` overrides the home coordinates for that process only; it never modifies meshscan settings. The bundled Inter and JetBrains Mono fonts are distributed under the SIL Open Font License (licences in `device/fonts/`).
+![Mesh map](docs/map-fit.png)
+![Selected node](docs/map-selected.png)
+![Home override and selected-node distance](docs/map-home.png)
+![Dashboard QR](docs/map-qr.png)
+![Mesh Map in APPLaunch](docs/map-launcher.png)
 
-![On-device radar](docs/radar.png)
-![Dashboard QR](docs/radar-qr.png)
-![Bearing mode with a diagnostic home override](docs/radar-bearing.png)
-![Mesh Radar in APPLaunch](docs/radar-launcher.png)
+Offline examples: [cached view](docs/map-offline-cached.png) and [uncached area](docs/map-offline-missing.png).
 
 ## Hardware notes
 

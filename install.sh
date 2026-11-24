@@ -27,7 +27,7 @@ echo "==> python environment (openhop-core for chat mode, meshtastic protobufs f
 printf '#!/bin/sh\nexec /opt/meshscan/venv/bin/python /opt/meshscan/meshscan-report.py "$@"\n' > /usr/local/bin/meshscan-report
 chmod 755 /usr/local/bin/meshscan-report
 
-echo "==> Mesh Radar (on-device app in the launcher)"
+echo "==> Mesh Map (on-device app in the launcher)"
 sh device/install-radar.sh >/dev/null
 
 echo "==> services"
@@ -46,4 +46,4 @@ for i in $(seq 1 20); do curl -fs localhost:8080/api/settings >/dev/null 2>&1 &&
 IP=$(hostname -I | awk '{print $1}')
 echo
 echo "meshscan is running. Open http://$(hostname).local:8080 (or http://$IP:8080) to finish setup."
-echo "Mesh Radar is in the Cardputer launcher (restart the launcher or log in again if it is not listed yet)."
+echo "Mesh Map is in the Cardputer launcher (restart the launcher or log in again if it is not listed yet)."

@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Meshscan's read-only Cardputer framebuffer radar."""
+"""Meshscan's read-only Cardputer framebuffer map."""
 import functools
-import hashlib
 import http.client
 import json
 import math
@@ -16,9 +15,10 @@ import threading
 import time
 import urllib.request
 
+import map_tiles
 import numpy as np
 import qrcode
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from PIL import Image, ImageDraw, ImageFont
 
 BASE = 'http://127.0.0.1:8080'
 W, H = 320, 170
@@ -30,9 +30,9 @@ BOLD = ImageFont.truetype(os.path.join(FONTS, 'Inter.ttf'), 11)
 BIG = ImageFont.truetype(os.path.join(FONTS, 'Inter.ttf'), 23)
 MONO = ImageFont.truetype(os.path.join(FONTS, 'JetBrainsMono.ttf'), 9)
 SMALL = ImageFont.truetype(os.path.join(FONTS, 'JetBrainsMono.ttf'), 7)
+ATTR = ImageFont.truetype(os.path.join(FONTS, 'Inter.ttf'), 6)
 for font in (BOLD, BIG):
     font.set_variation_by_name('Bold')
-CX, CY, RADIUS = 85, 85, 78
 
 
 def get(path):
@@ -55,24 +55,6 @@ def dashboard_url():
         return 'http://%s:8080' % ip
     except OSError:
         return 'http://localhost:8080'
-
-
-def position(node, home):
-    ident = str(node.get('node_id') or node.get('id') or '?')
-    lat, lon = node.get('lat'), node.get('lon')
-    if isinstance(home, dict) and all(isinstance(x, (int, float)) for x in (lat, lon, home.get('lat'), home.get('lon'))):
-        a, b, c, d = map(math.radians, (home['lat'], home['lon'], lat, lon))
-        dl = d - b
-        angle = math.atan2(math.sin(dl) * math.cos(c), math.cos(a) * math.sin(c) - math.sin(a) * math.cos(c) * math.cos(dl))
-        h = math.sin((c-a)/2)**2 + math.cos(a)*math.cos(c)*math.sin(dl/2)**2
-        distance = 12742 * math.asin(min(1, math.sqrt(max(0, h))))
-        radius = min(70, 7 + 63 * math.log1p(distance) / math.log(101))
-    else:
-        angle = int.from_bytes(hashlib.sha256(ident.encode()).digest()[:4], 'big') / 2**32 * math.tau
-        rssi = node.get('last_rssi')
-        rssi = rssi if isinstance(rssi, (int, float)) else -115
-        radius = max(8, min(70, 12 + (-rssi - 45) * .8))
-    return CX + math.sin(angle)*radius, CY - math.cos(angle)*radius, angle
 
 
 class Data:
@@ -231,206 +213,288 @@ def home_override():
     return None
 
 
-@functools.lru_cache(maxsize=32)
-def glow_sprite(rgb, size):
-    """Cached soft radial glow; alpha is pre-rendered rather than blurred per frame."""
-    extent = size * 4 + 5
-    y, x = np.ogrid[-extent:extent+1, -extent:extent+1]
-    alpha = (np.exp(-(x*x+y*y) / (2*(size*1.4)**2))*90).astype(np.uint8)
-    image = Image.new('RGBA', (2*extent+1, 2*extent+1), rgb + (0,))
-    image.putalpha(Image.fromarray(alpha, 'L'))
-    return image
+def age_seconds(node, now):
+    ts = node.get('last_seen')
+    return max(0, now-ts) if isinstance(ts, (int, float)) else float('inf')
 
 
-def glow(im, x, y, rgb, size):
-    sprite = glow_sprite(tuple(rgb), size)
-    im.paste(sprite, (int(x)-sprite.width//2, int(y)-sprite.height//2), sprite)
+def age_label(node, now):
+    age = age_seconds(node, now)
+    if not math.isfinite(age):
+        return 'unknown'
+    if age < 60:
+        return '%ds ago' % age
+    if age < 3600:
+        return '%dm ago' % (age//60)
+    if age < 86400:
+        return '%dh ago' % (age//3600)
+    return '%dd ago' % (age//86400)
 
 
-def plot_nodes(nodes, hops, home):
-    combined = [n for n in nodes if isinstance(n, dict)]
-    combined += [dict(n, proto='meshcore', kind='relay') for n in hops if isinstance(n, dict)]
-    combined.sort(key=lambda n: n.get('last_rssi') if isinstance(n.get('last_rssi'), (int, float)) else -999, reverse=True)
-    return [(n, *position(n, home)) for n in combined]
+def distance_km(a, b):
+    lat1, lon1, lat2, lon2 = map(math.radians, (a['lat'], a['lon'], b['lat'], b['lon']))
+    h = math.sin((lat2-lat1)/2)**2 + math.cos(lat1)*math.cos(lat2)*math.sin((lon2-lon1)/2)**2
+    return 12742*math.asin(min(1, math.sqrt(max(0, h))))
 
 
-def build_scope(positions, home):
-    im = Image.new('RGB', (W, H), (6, 8, 12))
-    d = ImageDraw.Draw(im)
-    d.ellipse((CX-RADIUS, CY-RADIUS, CX+RADIUS, CY+RADIUS), fill=(7, 17, 22), outline=(43, 77, 85))
-    # Subtle static CRT grid and alternating scanlines, clipped inside the circle.
-    for y in range(CY-RADIUS+3, CY+RADIUS-2, 3):
-        span = int(math.sqrt(max(0, (RADIUS-2)**2 - (y-CY)**2)))
-        d.line((CX-span, y, CX+span, y), fill=(8, 19, 24))
-    for r in (19, 38, 57):
-        d.ellipse((CX-r, CY-r, CX+r, CY+r), outline=(26, 52, 58))
-    d.line((CX-RADIUS+1, CY, CX+RADIUS-1, CY), fill=(25, 47, 54))
-    d.line((CX, CY-RADIUS+1, CX, CY+RADIUS-1), fill=(25, 47, 54))
-    d.text((81, 10), 'N', font=SMALL, fill=(110, 152, 159))
-    # Radius formula in position() maps these rings to approximately these values.
-    for y, label in zip((103, 122, 141), ('-55', '-78', '-101') if not home else ('1.4', '9', '38')):
-        d.text((89, y), label, font=SMALL, fill=(62, 101, 105))
-    d.text((12, 151), 'dBm' if not home else 'km', font=SMALL, fill=(76, 121, 125))
-    glow(im, CX, CY, (48, 162, 190), 4)
-    d = ImageDraw.Draw(im)
-    d.ellipse((CX-1, CY-1, CX+1, CY+1), fill=(135, 226, 233))
-    for node, x, y, _ in reversed(positions):
-        c = color(node.get('proto'))
-        snr = node.get('last_snr')
-        size = 2 if not isinstance(snr, (int, float)) or snr < 2 else 3
-        glow(im, x, y, c, size)
-        d = ImageDraw.Draw(im)
-        dim = tuple(int(v*.68) for v in c)
-        if node.get('kind') in ('repeater', 'relay'):
-            d.polygon([(x,y-size), (x+size,y), (x,y+size), (x-size,y)], fill=dim)
-        else:
-            d.ellipse((x-size,y-size,x+size,y+size), outline=dim, width=1)
-    # A few strong named stations, avoiding labels colliding with one another or the rim.
+def visible_nodes(nodes, show_all, now):
+    return [n for n in nodes if isinstance(n, dict) and map_tiles.valid_location(n)
+            and (show_all or age_seconds(n, now) < 86400)]
+
+
+def marker(draw, node, x, y, bright, selected=False):
+    color_value = color(node.get('proto'))
+    factor = 1 if bright else .52
+    c = tuple(int(v*factor) for v in color_value)
+    kind = node.get('kind')
+    x, y = int(x), int(y)
+    if selected:
+        draw.ellipse((x-7, y-7, x+7, y+7), outline=(235, 240, 241), width=1)
+    if kind == 'repeater':
+        draw.polygon(((x,y-4),(x+4,y),(x,y+4),(x-4,y)), fill=c)
+    elif kind == 'room':
+        draw.rectangle((x-3,y-3,x+3,y+3), outline=c, width=1)
+    elif kind == 'sensor':
+        draw.polygon(((x,y-4),(x+4,y+3),(x-4,y+3)), outline=c)
+    else:
+        draw.ellipse((x-3,y-3,x+3,y+3), fill=c)
+
+
+def draw_nodes(base, nodes, view, home, selected_id, now):
+    image = base.copy()
+    d = ImageDraw.Draw(image)
+    cx, cy, z = view
+    positions = []
+    for node in nodes:
+        wx, wy = map_tiles.project(node['lat'], node['lon'], z)
+        x = wx-cx+map_tiles.MAP_WIDTH/2
+        y = wy-cy+map_tiles.MAP_HEIGHT/2
+        if 0 <= x < map_tiles.MAP_WIDTH and 0 <= y < map_tiles.MAP_HEIGHT-12:
+            positions.append((node, x, y))
+    # Old points are drawn first, then the newest points and the selection.
+    positions.sort(key=lambda p: (p[0].get('node_id') == selected_id, -age_seconds(p[0], now)))
+    for node, x, y in positions:
+        marker(d, node, x, y, age_seconds(node, now) < 3600, node.get('node_id') == selected_id)
+    if home and map_tiles.valid_location(home):
+        wx, wy = map_tiles.project(home['lat'], home['lon'], z)
+        x, y = wx-cx+map_tiles.MAP_WIDTH/2, wy-cy+map_tiles.MAP_HEIGHT/2
+        if 0 <= x < map_tiles.MAP_WIDTH and 0 <= y < map_tiles.MAP_HEIGHT:
+            d.ellipse((x-6,y-6,x+6,y+6), outline=(250, 192, 112))
+            d.polygon(((x,y-3),(x+3,y),(x,y+3),(x-3,y)), fill=(250, 192, 112))
+    # Selected label first; then newest, preferring repeaters for equally recent nodes.
+    labels = sorted(positions, key=lambda p: (p[0].get('node_id') != selected_id, age_seconds(p[0], now), p[0].get('kind') != 'repeater'))
     occupied = []
-    d = ImageDraw.Draw(im)
-    for node, x, y, _ in positions:
+    for node, x, y in labels:
         name = node.get('short_name') or node.get('name')
         if not name:
             continue
-        label = clip(str(name), 42, SMALL)
-        width = int(SMALL.getlength(label))+4
-        options = [(x+5, y-10), (x-width-5, y+3), (x+5, y+3), (x-width-5, y-10)]
-        for lx, ly in options:
+        text = clip(str(name), 64, SMALL)
+        width = int(SMALL.getlength(text))+4
+        for lx, ly in ((x+5,y-11), (x-width-5,y+3), (x+5,y+3), (x-width-5,y-11)):
             box = (int(lx), int(ly), int(lx+width), int(ly+9))
-            if box[0] < 11 or box[2] > 159 or box[1] < 14 or box[3] > 155:
+            if box[0] < 0 or box[2] >= map_tiles.MAP_WIDTH or box[1] < 0 or box[3] >= 155:
                 continue
             if any(not (box[2] < b[0] or box[0] > b[2] or box[3] < b[1] or box[1] > b[3]) for b in occupied):
                 continue
-            d.rounded_rectangle(box, 2, fill=(8, 22, 29))
-            d.text((box[0]+2, box[1]-1), label, font=SMALL, fill=(160, 190, 199))
+            d.rounded_rectangle(box, radius=2, fill=(8,19,26))
+            d.text((box[0]+2,box[1]-1), text, font=SMALL, fill=(185, 208, 216))
             occupied.append(box)
             break
-        if len(occupied) == 3:
+        if len(occupied) >= 4:
             break
-    return im
+    d.rectangle((0, 158, 190, 169), fill=(7, 15, 19))
+    d.text((2,158), '© OpenStreetMap  ·  OpenMapTiles  ·  OpenFreeMap', font=ATTR, fill=(145, 168, 173))
+    return image, positions
 
 
-def build_panel(data, positions, selected):
-    im = Image.new('RGB', (150, H), (6, 8, 12))
+def build_map_panel(data, nodes, selected, now, home, on_map):
+    im = Image.new('RGB', (130, 170), (6, 8, 12))
     d = ImageDraw.Draw(im)
     with data.lock:
-        status, summary = data.status, data.summary
-        online = data.online
+        status, summary, online = data.status, data.summary, data.online
         kind = getattr(data, 'ticker_kind', 'LISTEN')
         sender = getattr(data, 'ticker_sender', 'Waiting for traffic')
-        proto = getattr(data, 'ticker_proto', None)
     mode = str(status.get('mode') or '').upper()
     accent = GREEN if mode == 'CHAT' else BLUE
-    d.line((0, 10, 0, 159), fill=(32, 44, 52))
-    d.rounded_rectangle((7, 7, 53, 23), radius=4, fill=(14, 38, 37) if mode == 'CHAT' else (14, 29, 44))
-    d.text((13, 9), mode if mode in ('CHAT', 'SCAN') else '----', font=MONO, fill=accent)
-    d.ellipse((76, 12, 80, 16), fill=GREEN if online else (255, 184, 107))
-    d.text((85, 9), 'LIVE' if online else 'OFFLINE', font=MONO, fill=GREEN if online else (255, 184, 107))
-    title = preset_name(status.get('config'))
-    d.text((7, 28), clip(title, 137, BOLD), font=BOLD, fill=TEXT if online else MUTED)
+    d.line((0, 6, 0, 165), fill=(35, 50, 57))
+    d.rounded_rectangle((7, 5, 51, 20), 4, fill=(14,38,37) if mode == 'CHAT' else (14,29,44))
+    d.text((11,6), mode if mode in ('CHAT','SCAN') else '----', font=MONO, fill=accent)
+    d.ellipse((65,10,69,14), fill=GREEN if online else (255,184,107))
+    d.text((73,6), 'LIVE' if online else 'OFFLINE', font=MONO, fill=GREEN if online else (255,184,107))
+    d.text((7,23), clip(preset_name(status.get('config')), 118, BOLD), font=BOLD, fill=TEXT)
     freq = status.get('freq')
-    desc = '%s MHz  /  SF%s' % (freq, status.get('sf', '?')) if freq is not None else 'Reconnecting to API'
-    d.text((7, 43), clip(desc, 137, MONO), font=MONO, fill=MUTED)
-    d.text((7, 56), str(summary.get('n', '--')), font=BIG, fill=TEXT)
-    d.text((89, 56), str(summary.get('nodes', '--')), font=BIG, fill=BLUE)
-    d.text((8, 83), 'PACKETS', font=SMALL, fill=MUTED)
-    d.text((90, 83), 'NODES', font=SMALL, fill=MUTED)
-    d.line((7, 96, 143, 96), fill=(31, 44, 52))
-    if selected and positions:
-        node = positions[(selected-1) % len(positions)][0]
-        kind, sender = 'NODE', str(node.get('name') or node.get('node_id') or node.get('id') or 'Unknown')
-        proto = node.get('proto')
-    chip = clip(kind.upper(), 54, SMALL)
-    chip_width = min(59, max(29, int(SMALL.getlength(chip))+8))
-    c = color(proto) if proto else BLUE
-    d.rounded_rectangle((7, 102, 7+chip_width, 115), radius=3, fill=tuple(int(v*.13) for v in c))
-    d.text((11, 103), chip, font=SMALL, fill=c)
-    d.text((13+chip_width, 103), clip(sender, 130-chip_width, FONT), font=FONT, fill=TEXT)
-    d.text((7, 122), 'NOISE FLOOR', font=SMALL, fill=MUTED)
-    noise = status.get('noise')
-    value = ('%.0f dBm' % noise) if isinstance(noise, (int, float)) else '-- dBm'
-    d.text((103, 122), value, font=SMALL, fill=TEXT)
-    hist = status.get('noise_hist') or []
-    vals = [row[1] for row in hist[-48:] if isinstance(row, list) and len(row)>1 and isinstance(row[1], (int,float))]
-    if len(vals) > 1:
-        lo, hi = min(vals)-1, max(vals)+1
-        points = [(8+i*134/(len(vals)-1), 148-(v-lo)/(hi-lo)*13) for i,v in enumerate(vals)]
-        d.line(points, fill=(55, 153, 168), width=1)
+    desc = '%s MHz / SF%s' % (freq, status.get('sf','?')) if freq is not None else 'Waiting for API'
+    d.text((7,37), clip(desc, 118, SMALL), font=SMALL, fill=MUTED)
+    recent = sum(1 for n in nodes if isinstance(n, dict) and age_seconds(n, now)<3600)
+    no_gps = sum(1 for n in nodes if isinstance(n, dict) and not map_tiles.valid_location(n))
+    d.text((7,47), str(on_map), font=BIG, fill=TEXT)
+    d.text((72,47), str(recent), font=BIG, fill=BLUE)
+    d.text((8,73), 'ON MAP', font=SMALL, fill=MUTED)
+    d.text((73,73), 'LAST 1H', font=SMALL, fill=MUTED)
+    d.text((7,84), '%s WITHOUT GPS' % no_gps, font=SMALL, fill=(133,159,165))
+    d.line((7,97,123,97), fill=(31,44,52))
+    if selected:
+        name = selected.get('short_name') or selected.get('name') or selected.get('node_id') or 'Unknown'
+        d.text((7,99), clip(name, 116, BOLD), font=BOLD, fill=TEXT)
+        desc = '%s · %s' % (str(selected.get('kind') or 'node').upper(), age_label(selected, now))
+        d.text((7,113), clip(desc, 116, SMALL), font=SMALL, fill=BLUE)
+        detail = '%s pkts' % selected.get('packets', 0)
+        if home and map_tiles.valid_location(home):
+            detail += ' · %.1f km' % distance_km(home, selected)
+        d.text((7,123), clip(detail, 116, SMALL), font=SMALL, fill=MUTED)
     else:
-        d.line((8, 145, 142, 145), fill=(31, 55, 61))
-    d.text((7, 155), 'SHIFT+Q  DASHBOARD', font=SMALL, fill=(108, 145, 151))
+        d.text((7,99), clip(str(kind).upper(), 116, SMALL), font=SMALL, fill=BLUE)
+        d.text((7,110), clip(sender, 116, FONT), font=FONT, fill=TEXT)
+        d.text((7,123), 'TAB SELECT  F FIT', font=SMALL, fill=MUTED)
+    hist = status.get('noise_hist') or []
+    vals = [r[1] for r in hist[-35:] if isinstance(r,list) and len(r)>1 and isinstance(r[1], (int,float))]
+    noise = status.get('noise')
+    d.text((7,137), 'NOISE', font=SMALL, fill=MUTED)
+    d.text((95,137), ('%.0f' % noise) if isinstance(noise,(int,float)) else '--', font=SMALL, fill=TEXT)
+    if len(vals)>1:
+        lo, hi = min(vals)-1, max(vals)+1
+        d.line([(7+i*116/(len(vals)-1), 158-(v-lo)/(hi-lo)*10) for i,v in enumerate(vals)], fill=(55,153,168))
+    if selected:
+        d.text((7,160), clip(str(kind).upper() + ' · ' + str(sender), 116, SMALL), font=SMALL, fill=BLUE)
+    else:
+        d.text((7,160), 'Q EXIT  SHIFT+Q QR', font=SMALL, fill=(108,145,151))
     return im
 
 
 class Renderer:
     def __init__(self):
-        self.home = home_override()
-        self.scope_key = None
-        self.panel_at = 0
+        self.override_home = home_override()
+        self.home = self.override_home
+        self.worker = map_tiles.TileWorker()
+        self.view = None
         self.positions = []
-        self.scope = None
+        self.nodes = []
+        self.selected_id = None
+        self.show_all = False
+        self.panel_at = 0
+        self.cache_key = None
+        self.map_image = None
         self.panel = None
-        self.trail = np.zeros((80, 80), dtype=np.float32)
-        self.beams = []
-        for i in range(180):
-            angle = i * math.tau / 180
-            mask = Image.new('L', (80, 80))
-            d = ImageDraw.Draw(mask)
-            d.line((40, 40, 40+37*math.sin(angle), 40-37*math.cos(angle)), fill=200, width=1)
-            self.beams.append(np.asarray(mask, dtype=np.float32))
+        self.last_missing = 0
+        self.autofit = True
+
+    def fit_nodes(self):
+        self.view = map_tiles.fit(visible_nodes(self.nodes, self.show_all, time.time()))
+        if self.view is None and self.home and map_tiles.valid_location(self.home):
+            self.view = (*map_tiles.project(self.home['lat'], self.home['lon'], 11), 11)
+        self.autofit = self.view is None
+        self.cache_key = None
+
+    def change_view(self, code):
+        if code == 33:  # F
+            self.fit_nodes()
+            return
+        if code == 30:  # A: include old nodes
+            self.show_all = not self.show_all
+            self.cache_key = None
+            self.panel_at = 0
+            return
+        if code == 35 and self.home and map_tiles.valid_location(self.home):
+            z = self.view[2] if self.view else 11
+            self.view = (*map_tiles.project(self.home['lat'], self.home['lon'], z), z)
+            self.cache_key = None
+            return
+        if code in (15, 57):
+            available = sorted(visible_nodes(self.nodes, self.show_all, time.time()), key=lambda n: age_seconds(n, time.time()))
+            if available:
+                ids = [n.get('node_id') for n in available]
+                index = (ids.index(self.selected_id)+1) % len(ids) if self.selected_id in ids else 0
+                node = available[index]
+                self.selected_id = node.get('node_id')
+                z = self.view[2] if self.view else 11
+                self.view = (*map_tiles.project(node['lat'], node['lon'], z), z)
+                self.cache_key = None
+                self.panel_at = 0
+            return
+        if not self.view:
+            return
+        x,y,z = self.view
+        if code in (105,106,103,108):
+            dx, dy = {105:(-40,0),106:(40,0),103:(0,-40),108:(0,40)}[code]
+            self.view = (x+dx,y+dy,z)
+        elif code in (12, 13, 71, 72, 73):
+            # Cardputer Sym layer sends 71='-', 72='+', 73='='; standard
+            # keyboards instead send KEY_MINUS=12 / KEY_EQUAL=13.
+            newz = max(2, min(14, z+(-1 if code in (12, 71) else 1)))
+            factor = 2**(newz-z)
+            self.view = (x*factor,y*factor,newz)
+        else:
+            return
+        self.cache_key = None
 
     def render(self, data, now, qr_view, selected, url):
         if qr_view:
-            im = Image.new('RGB', (W, H), (6, 8, 12))
+            im = Image.new('RGB', (W,H), (6,8,12))
             d = ImageDraw.Draw(im)
-            qr = qr_image(url, 150)
-            im.paste(qr, (9, (H-qr.height)//2))
-            d.text((174, 23), 'DASHBOARD', font=BOLD, fill=BLUE)
-            d.text((174, 47), 'Scan to explore', font=FONT, fill=TEXT)
-            d.text((174, 62), 'your live mesh.', font=FONT, fill=MUTED)
-            d.text((174, 91), url, font=SMALL, fill=TEXT)
-            d.line((174, 114, 311, 114), fill=(33, 54, 65))
-            d.text((174, 126), 'SHIFT+Q  BACK', font=MONO, fill=MUTED)
+            qr = qr_image(url,150)
+            im.paste(qr,(9,(H-qr.height)//2))
+            d.text((174,23),'DASHBOARD',font=BOLD,fill=BLUE)
+            d.text((174,47),'Scan to explore',font=FONT,fill=TEXT)
+            d.text((174,62),'your live mesh.',font=FONT,fill=MUTED)
+            d.text((174,91),url,font=SMALL,fill=TEXT)
+            d.line((174,114,311,114),fill=(33,54,65))
+            d.text((174,126),'SHIFT+Q  BACK',font=MONO,fill=MUTED)
             return im
+        wall = time.time()
         with data.lock:
-            nodes, hops, settings = data.nodes, data.hops, data.settings
-            events = list(data.events)
-        home = self.home or settings.get('home')
-        key = (id(nodes), id(hops), str(home))
-        if key != self.scope_key:
-            self.positions = plot_nodes(nodes, hops, home)
-            self.scope = build_scope(self.positions, home)
-            self.scope_key = key
-            self.panel_at = 0
+            nodes, settings, events = data.nodes, data.settings, list(data.events)
+        self.nodes = nodes
+        self.home = self.override_home or settings.get('home')
+        if self.autofit and (nodes or data.online):
+            self.fit_nodes()
+        selected_node = next((n for n in nodes if isinstance(n, dict) and n.get('node_id') == self.selected_id and map_tiles.valid_location(n)), None)
+        if self.view:
+            view = (round(self.view[0]), round(self.view[1]), self.view[2])
+            self.worker.request(view)
+            with self.worker.lock:
+                result = self.worker.result
+            tile_ready = result and result[0] == view
+        else:
+            view, result, tile_ready = None, None, False
+        if tile_ready:
+            visible = visible_nodes(nodes, self.show_all, wall)
+            key = (view, id(nodes), self.selected_id, self.show_all, str(self.home), id(result[1]))
+            if key != self.cache_key:
+                self.map_image, self.positions = draw_nodes(result[1], visible, view, self.home, self.selected_id, wall)
+                self.last_missing = result[2]
+                self.cache_key = key
+                self.panel_at = 0
+            image = self.map_image.copy()
+            d = ImageDraw.Draw(image)
+            if self.last_missing:
+                d.rectangle((4,4,133,17), fill=(20,25,28))
+                d.text((7,5),'MAP TILES UNAVAILABLE',font=SMALL,fill=(255,184,107))
+            # Gentle pulse only for recently heard locations.
+            pulse = int(75+35*(1+math.sin(now*2))/2)
+            for node,x,y in self.positions:
+                if age_seconds(node, wall) < 3600:
+                    d.ellipse((x-6,y-6,x+6,y+6), outline=(pulse//2,pulse,pulse))
+            for t, ids in events:
+                age = now-t
+                if not 0 <= age < 1.4:
+                    continue
+                match = next(((x,y) for n,x,y in self.positions if any(s and (str(n.get('node_id') or '').lower().startswith(s) or s.startswith(str(n.get('node_id') or 'not-an-id').lower()) or str(n.get('name') or '').lower()==s) for s in ids)), None)
+                if match:
+                    x,y = match
+                    r,v = 3+age*11, int(200*(1-age/1.4))
+                    d.ellipse((x-r,y-r,x+r,y+r), outline=(v//2,v,v))
+        else:
+            image = Image.new('RGB', (map_tiles.MAP_WIDTH,H), (10,17,22))
+            d = ImageDraw.Draw(image)
+            d.text((14,70), 'LOADING MAP…' if view else 'WAITING FOR LOCATIONS…', font=BOLD, fill=(103,153,163))
+            d.text((3,158),'© OpenStreetMap  ·  OpenMapTiles  ·  OpenFreeMap',font=ATTR,fill=(145,168,173))
         if now >= self.panel_at:
-            self.panel = build_panel(data, self.positions, selected)
-            self.panel_at = now + 0.8
-        im = self.scope.copy()
-        im.paste(self.panel, (170, 0))
-        sweep = (now * .8) % math.tau
-        self.trail *= .90
-        np.add(self.trail, self.beams[int(sweep / math.tau * 180) % 180], out=self.trail)
-        np.minimum(self.trail, 200, out=self.trail)
-        # The decaying half-resolution intensity field supplies a soft phosphor trail.
-        alpha = Image.fromarray(self.trail.astype(np.uint8), 'L').resize((156, 156), Image.Resampling.BILINEAR)
-        im.paste((37, 142, 157), (7, 7, 163, 163), alpha)
-        d = ImageDraw.Draw(im)
-        d.line((CX, CY, CX+75*math.sin(sweep), CY-75*math.cos(sweep)), fill=(87, 191, 208))
-        for node, x, y, angle in self.positions:
-            age = (sweep - angle) % math.tau
-            if age < .16:
-                glow(im, x, y, color(node.get('proto')), 3)
-                d = ImageDraw.Draw(im)
-                d.ellipse((x-1,y-1,x+1,y+1), fill=TEXT)
-        for t, ids in events:
-            age = now-t
-            if not 0 <= age < 1.4:
-                continue
-            match = next(((x,y) for n,x,y,_ in self.positions if any(s and (str(n.get('node_id') or n.get('id') or '').lower().startswith(s) or s.startswith(str(n.get('node_id') or n.get('id') or 'not-an-id').lower()) or str(n.get('name') or '').lower() == s) for s in ids)), (CX,CY))
-            x, y = match
-            r, v = 2+age*13, int(190*(1-age/1.4))
-            d.ellipse((x-r,y-r,x+r,y+r), outline=(v//2,v,v))
-        return im
+            self.panel = build_map_panel(data, nodes, selected_node, wall, self.home, len(self.positions) if tile_ready else 0)
+            self.panel_at = now+1
+        frame = Image.new('RGB',(W,H))
+        frame.paste(image,(0,0))
+        frame.paste(self.panel,(190,0))
+        return frame
 
 
 def render(data, now, qr_view, selected, url):
@@ -440,44 +504,47 @@ def render(data, now, qr_view, selected, url):
 
 def main():
     data, url, renderer = Data(), dashboard_url(), Renderer()
-    fb = os.open(os.environ.get('APPLAUNCH_LINUX_FBDEV_DEVICE', '/dev/fb0'), os.O_RDWR)
-    mapping = mmap.mmap(fb, W*H*2, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE)
-    keyboard = os.environ.get('APPLAUNCH_LINUX_KEYBOARD_DEVICE', '/dev/input/by-path/platform-3f804000.i2c-event')
-    keyfd = os.open(keyboard, os.O_RDONLY | os.O_NONBLOCK)
+    fb = os.open(os.environ.get('APPLAUNCH_LINUX_FBDEV_DEVICE','/dev/fb0'),os.O_RDWR)
+    mapping = mmap.mmap(fb,W*H*2,mmap.MAP_SHARED,mmap.PROT_READ|mmap.PROT_WRITE)
+    keyboard = os.environ.get('APPLAUNCH_LINUX_KEYBOARD_DEVICE','/dev/input/by-path/platform-3f804000.i2c-event')
+    keyfd = os.open(keyboard,os.O_RDONLY|os.O_NONBLOCK)
     event = struct.Struct('@llHHi')
-    qr_view, selected, running, shifted = False, 0, True, False
+    qr_view, running, shifted = False, True, False
     frames, started = 0, time.monotonic()
     try:
         while running:
             start = time.monotonic()
-            while select.select([keyfd], [], [], 0)[0]:
-                raw = os.read(keyfd, event.size)
-                if len(raw) != event.size:
+            while select.select([keyfd],[],[],0)[0]:
+                raw = os.read(keyfd,event.size)
+                if len(raw)!=event.size:
                     break
-                _, _, kind, code, value = event.unpack(raw)
-                if kind != 1:
+                _,_,kind,code,value = event.unpack(raw)
+                if kind!=1:
                     continue
-                if code in (42, 54):
+                if code in (42,54):
                     shifted = bool(value)
                 elif value == 1:
                     if code == 1 or (code == 16 and not shifted):
                         running = False
                     elif code == 16 and shifted:
                         qr_view = not qr_view
-                    elif code in (15, 57):
-                        selected += 1
-                        renderer.panel_at = 0
-            frame = renderer.render(data, start, qr_view, selected, url)
-            rgb = np.asarray(frame, dtype=np.uint16)
-            pixels = ((rgb[:,:,0] >> 3) << 11) | ((rgb[:,:,1] >> 2) << 5) | (rgb[:,:,2] >> 3)
+                    else:
+                        renderer.change_view(code)
+            frame = renderer.render(data,start,qr_view,0,url)
+            rgb = np.asarray(frame,dtype=np.uint16)
+            pixels = ((rgb[:,:,0]>>3)<<11)|((rgb[:,:,1]>>2)<<5)|(rgb[:,:,2]>>3)
             mapping[:] = pixels.astype('<u2').tobytes()
             frames += 1
-            delay = 1/24 - (time.monotonic()-start)
-            if delay > 0:
+            with data.lock:
+                has_pulses = any(start-t < 1.4 for t, _ in data.events)
+            has_recent = any(age_seconds(n, time.time()) < 3600 for n, _, _ in renderer.positions)
+            fps = 12 if not qr_view and (has_recent or has_pulses) else 4
+            delay = 1/fps-(time.monotonic()-start)
+            if delay>0:
                 time.sleep(delay)
     finally:
         elapsed = time.monotonic()-started
-        print('radar: %.2f fps (%d frames in %.1fs)' % (frames/elapsed, frames, elapsed), file=sys.stderr, flush=True)
+        print('map: %.2f fps (%d frames in %.1fs)'%(frames/elapsed,frames,elapsed),file=sys.stderr,flush=True)
         os.close(keyfd)
         mapping.close()
         os.close(fb)
