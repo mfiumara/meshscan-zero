@@ -13,7 +13,7 @@ So meshscan hops between presets, saves everything it hears to SQLite, and shows
 - Drives the SX1262 directly over SPI. **It never transmits.**
 - Cycles through presets (defaults below; override with `/etc/meshscan.json`).
 - Stores every packet with RSSI, SNR, raw bytes, and CRC status, plus per-preset counters for preambles and headers, so you can see activity even when nothing decodes.
-- **MeshCore:** decodes adverts (name, type, location, public key), logs the relay path, and decrypts the Public group channel.
+- **MeshCore:** decodes adverts (name, type, location, public key), logs the relay path, and decrypts the Public group channel (verified on air: 166 Public messages overnight in Amsterdam).
 - **Meshtastic:** decrypts the default channel (`AQ==`) and extracts node info, position, telemetry, and text.
 - Keeps a node table (first seen, last seen, packet count, last RSSI/SNR), like a normal mesh node does.
 - Serves a live dashboard on port 8080: packets stream in over Server-Sent Events, nodes on a MapLibre vector map (OpenFreeMap, no API key), what the radio is listening to right now, noise floor, relays, presets, and messages. Works on phones too.
@@ -48,7 +48,7 @@ The cap needs power before the SX1262 responds. meshscan switches on `/sys/class
 This is a weekend-afternoon tool, tested on one CardputerZero v5 in Amsterdam.
 
 - Verified on air: MeshCore adverts, relay paths, and Meshtastic NodeInfo decryption.
-- Not verified on air yet: MeshCore Public channel decryption (every group message I heard was on other channels), Meshtastic position and text, and the LoRaWAN slot.
+- Not verified on air yet: Meshtastic position and text, and the LoRaWAN slot.
 - Only the EU868 presets are set up. Other regions need a different config.
 - Uses polling instead of DIO1 interrupts. That's fine for logging, but it's not a real node.
 

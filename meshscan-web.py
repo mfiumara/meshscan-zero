@@ -58,6 +58,7 @@ def api(path, qs):
         r["nodes"] = q("SELECT COUNT(*) n FROM nodes WHERE node_id NOT LIKE 'hop:%'")[0]["n"]
         r["relays"] = q("SELECT COUNT(*) n FROM nodes WHERE node_id LIKE 'hop:%'")[0]["n"]
         r["hour"] = q("SELECT COUNT(*) n FROM packets WHERE ts>?", (time.time() - 3600,))[0]["n"]
+        r["messages"] = q("SELECT COUNT(*) n FROM messages")[0]["n"]
         return r
     return None
 
