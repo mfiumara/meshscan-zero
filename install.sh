@@ -8,6 +8,7 @@ cd "$(dirname "$0")"
 USER_NAME="${SUDO_USER:-pi}"
 
 echo "==> system packages"
+apt-get update -qq || echo "    (apt update failed; trying with the existing package lists)"
 apt-get install -y -qq python3-venv python3-smbus2 python3-spidev python3-libgpiod python3-cryptography >/dev/null
 
 echo "==> files"
