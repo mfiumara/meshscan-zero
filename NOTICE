@@ -5,6 +5,8 @@ This product includes software adapted from MeshTerm (https://github.com/jpmarti
 Copyright the MeshTerm authors, licensed under the Apache License, Version 2.0
 (see licenses/Apache-2.0.txt). Adapted file: meshscan_board.py (from meshterm/core/radionode.py).
 
+Bundled fonts (device/fonts/): Inter and JetBrains Mono, SIL Open Font License 1.1.
+
 Runtime dependencies installed by install.sh (not bundled):
   openhop-core (MIT), python-periphery (MIT), meshtastic (GPL-3.0), MapLibre GL JS (BSD-3-Clause, CDN),
-  OpenFreeMap tiles (OpenStreetMap data, ODbL).
+  OpenFreeMap tiles (OpenStreetMap data, ODbL), Pillow, NumPy, qrcode (Mesh Radar).

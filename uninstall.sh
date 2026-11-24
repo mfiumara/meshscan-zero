@@ -5,7 +5,8 @@ set -euo pipefail
 systemctl disable --now meshscan meshscan-web 2>/dev/null || true
 rm -f /etc/systemd/system/meshscan.service /etc/systemd/system/meshscan-web.service /usr/local/bin/meshscan-report
 systemctl daemon-reload
-rm -rf /opt/meshscan
+rm -rf /opt/meshscan /opt/meshscan-radar
+rm -f /usr/share/APPLaunch/applications/meshscan-radar.desktop /usr/share/APPLaunch/share/images/meshscan-radar.png
 if [ "${1:-}" = "--purge" ]; then
   rm -rf /var/lib/meshscan /etc/meshscan.json
   echo "meshscan removed, including its data."

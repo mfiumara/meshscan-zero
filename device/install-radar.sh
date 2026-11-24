@@ -9,8 +9,8 @@ install -m 644 "$HERE"/fonts/* /opt/meshscan-radar/fonts/
 if [ ! -x /opt/meshscan-radar/venv/bin/python ]; then
     python3 -m venv --system-site-packages /opt/meshscan-radar/venv
 fi
-/opt/meshscan-radar/venv/bin/python -m pip install 'qrcode>=7.4,<9'
-/opt/meshscan-radar/venv/bin/python -c 'import PIL, numpy' || /opt/meshscan-radar/venv/bin/python -m pip install pillow numpy
+/opt/meshscan-radar/venv/bin/python -m pip install -q 'qrcode>=7.4,<9'
+/opt/meshscan-radar/venv/bin/python -c 'import PIL, numpy' || /opt/meshscan-radar/venv/bin/python -m pip install -q pillow numpy
 install -m 644 "$HERE/meshscan-radar.desktop" /usr/share/APPLaunch/applications/meshscan-radar.desktop
 install -m 644 "$HERE/meshscan-radar.png" /usr/share/APPLaunch/share/images/meshscan-radar.png
 echo 'Installed Mesh Radar; open it from APPLaunch.'

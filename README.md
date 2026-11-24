@@ -61,11 +61,9 @@ Your node doesn't send adverts, so it won't show up in other people's contact li
 
 ## On-device radar
 
-The optional **Mesh Radar** APPLaunch app shows a sweeping scope, live packet/node counts, signal and noise, and a QR link to the dashboard. Diamonds are repeaters/relays; dots are other nodes. With a configured home location, located nodes use bearing and log-scaled distance; otherwise the angle is stable but arbitrary and radius approximates signal strength. It reads only the local HTTP API and keeps retrying if the web service is unavailable.
+The **Mesh Radar** launcher app shows a sweeping scope, live packet/node counts, signal and noise, and a QR link to the dashboard. Diamonds are repeaters/relays; dots are other nodes. With a configured home location, located nodes use bearing and log-scaled distance; otherwise the angle is stable but arbitrary and radius approximates signal strength. It reads only the local HTTP API and keeps retrying if the web service is unavailable.
 
-```sh
-sudo ./device/install-radar.sh
-```
+`install.sh` installs it too (or run `sudo ./device/install-radar.sh` on its own).
 
 Launch **Mesh Radar** from APPLaunch. **Shift+Q** toggles the full-screen dashboard QR; **Space** or **Tab** cycles nodes by signal strength; **Esc** or lowercase **q** exits. The dashboard URL is also visible in the QR view. The installer uses a separate venv under `/opt/meshscan-radar` and does not restart meshscan services. If the launcher has not refreshed its app list, restart the user `APPLaunch.service` or log in again.
 
