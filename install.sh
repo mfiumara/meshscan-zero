@@ -5,7 +5,11 @@ set -euo pipefail
 cd "$(dirname "$0")"
 apt-get install -y -qq python3-venv python3-smbus2 python3-spidev python3-libgpiod python3-cryptography >/dev/null
 mkdir -p /opt/meshscan /var/lib/meshscan
-install -m 755 meshscan.py meshscan-web.py meshscan-report.py /opt/meshscan/
+# The dashboard (runs as the desktop user) drops mode switches and outgoing messages here.
+install -d -o "${SUDO_USER:-pi}" -g "${SUDO_USER:-pi}" /var/lib/meshscan/ctl /var/lib/meshscan/ctl/outbox
+# New installs start receive-only. Chat (transmitting) is opt-in: see README.
+[ -f /etc/meshscan.json ] || printf '{"default_mode": "scan", "node": {"name": "%s", "scope": "nl-nh", "channels": []}}\n' "$(hostname)" > /etc/meshscan.json
+install -m 755 meshscan.py meshscan_chat.py meshscan-web.py meshscan-report.py /opt/meshscan/
 install -d /opt/meshscan/web && install -m 644 web/index.html /opt/meshscan/web/
 [ -x /opt/meshscan/venv/bin/python ] || python3 -m venv --system-site-packages /opt/meshscan/venv
 /opt/meshscan/venv/bin/pip install -q meshtastic   # protobuf definitions for Meshtastic decoding

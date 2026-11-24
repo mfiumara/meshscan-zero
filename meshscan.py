@@ -6,6 +6,7 @@ packet to SQLite, decodes Meshtastic (default key) and MeshCore (adverts, Public
 channel) and keeps a node database. Never transmits.
 """
 import base64, hashlib, hmac, json, os, signal, sqlite3, struct, sys, time
+from pathlib import Path
 
 import gpiod, smbus2, spidev
 from gpiod.line import Direction, Value
@@ -234,7 +235,45 @@ def upsert_node(db, proto, node_id, now, rssi, snr, **f):
             db.execute(f"UPDATE nodes SET {k}=? WHERE proto=? AND node_id=?", (v, proto, node_id))
 
 
-def store(db, c, data, rssi, snr, crc_ok):
+MSG_COLUMNS = {"direction": "TEXT DEFAULT 'in'", "status": "TEXT", "repeats": "INT DEFAULT 0", "sender_ts": "INT",
+               "rssi": "REAL", "snr": "REAL", "hops": "INT", "updated": "REAL"}
+
+
+def migrate(db):
+    have = {r[1] for r in db.execute("PRAGMA table_info(messages)")}
+    for col, decl in MSG_COLUMNS.items():
+        if col not in have:
+            db.execute(f"ALTER TABLE messages ADD COLUMN {col} {decl}")
+    if "sender_ts" not in have:  # one-time cleanup: older versions stored one row per repeat heard
+        db.execute("DELETE FROM messages WHERE id IN (SELECT b.id FROM messages a JOIN messages b ON a.text=b.text "
+                   "AND IFNULL(a.channel,'')=IFNULL(b.channel,'') AND a.id<b.id AND b.ts-a.ts<600)")
+        db.execute("UPDATE messages SET updated=ts WHERE updated IS NULL")
+    # older versions kept "Name: text" in one field
+    db.execute("UPDATE messages SET src=substr(text,1,instr(text,': ')-1), text=substr(text,instr(text,': ')+2) "
+               "WHERE src IS NULL AND instr(text,': ') BETWEEN 2 AND 48")
+    db.commit()
+
+
+def record_message(db, proto, channel, src, text, sender_ts=None, rssi=None, snr=None, hops=None):
+    """Insert a received message once; further copies (repeats) only bump its counter."""
+    if src is None and text and ": " in text[:48]:
+        src, text = text.split(": ", 1)
+    now = time.time()
+    if sender_ts is not None:
+        row = db.execute("SELECT id FROM messages WHERE proto=? AND IFNULL(channel,'')=IFNULL(?,'') AND IFNULL(src,'')=IFNULL(?,'') "
+                         "AND text=? AND sender_ts=?", (proto, channel, src, text, sender_ts)).fetchone()
+    else:
+        row = db.execute("SELECT id FROM messages WHERE proto=? AND text=? AND IFNULL(src,'')=IFNULL(?,'') AND ts>?",
+                         (proto, text, src, now - 600)).fetchone()
+    if row:
+        db.execute("UPDATE messages SET repeats=repeats+1 WHERE id=?", (row[0],))
+    else:
+        db.execute("INSERT INTO messages(ts,proto,channel,src,text,direction,repeats,sender_ts,rssi,snr,hops,updated) "
+                   "VALUES(?,?,?,?,?,'in',0,?,?,?,?,?)", (now, proto, channel, src, text, sender_ts, rssi, snr, hops, now))
+    db.commit()
+
+
+def store(db, c, data, rssi, snr, crc_ok, messages=True):
     now = time.time(); dec = None
     try:
         if crc_ok and c["proto"] == "meshtastic":
@@ -250,17 +289,16 @@ def store(db, c, data, rssi, snr, crc_ok):
         u = dec.get("user") or {}; pos = dec.get("pos") or {}
         upsert_node(db, "meshtastic", dec["src"], now, rssi, snr, name=u.get("long_name"), short_name=u.get("short_name"),
                     hw=u.get("hw"), lat=pos.get("lat"), lon=pos.get("lon"))
-        if dec.get("text"):
-            db.execute("INSERT INTO messages(ts,proto,channel,src,text) VALUES(?,?,?,?,?)",
-                       (now, "meshtastic", str(dec["channel_hash"]), dec["src"], dec["text"]))
+        if dec.get("text") and messages:
+            record_message(db, "meshtastic", "LongFast", dec["src"], dec["text"], rssi=rssi, snr=snr)
     if dec and c["proto"] == "meshcore":
         if dec.get("pubkey"):
             pos = dec.get("pos") or {}
             upsert_node(db, "meshcore", dec["pubkey"][:16], now, rssi, snr, name=dec.get("name"),
                         kind=dec.get("node_type"), lat=pos.get("lat"), lon=pos.get("lon"))
-        if dec.get("text"):
-            db.execute("INSERT INTO messages(ts,proto,channel,src,text) VALUES(?,?,?,?,?)",
-                       (now, "meshcore", dec.get("channel"), None, dec["text"]))
+        if dec.get("text") and messages:
+            record_message(db, "meshcore", dec.get("channel"), None, dec["text"], sender_ts=dec.get("ts"),
+                           rssi=rssi, snr=snr, hops=dec.get("hops"))
         # last relay hop = a repeater we heard directly
         if dec.get("path") and dec["route"] in ("FLOOD", "TRANSPORT_FLOOD"):
             upsert_node(db, "meshcore", "hop:" + dec["path"][-1], now, rssi, snr, kind="repeater?")
@@ -271,43 +309,80 @@ def store(db, c, data, rssi, snr, crc_ok):
 # ---------------------------------------------------------------- main loop
 RUNNING = True
 STATUS = os.path.join(os.path.dirname(DB), "status.json")
+CTL = Path(os.path.dirname(DB)) / "ctl"
 NOISE_HIST = []  # (ts, dBm, config) for the dashboard sparkline
 
 
-def write_status(c, start, end, st, noise):
+def write_status_raw(d):
     try:
         tmp = STATUS + ".tmp"
         with open(tmp, "w") as f:
-            json.dump({"ts": time.time(), "config": c["name"], "proto": c["proto"], "freq": c["freq"], "sf": c["sf"],
-                       "bw": c["bw"], "start": start, "end": end, "stats": st, "noise": noise[-1] if noise else None,
-                       "noise_hist": NOISE_HIST[-120:]}, f)
+            json.dump({"ts": time.time(), **d}, f)
         os.chmod(tmp, 0o644); os.replace(tmp, STATUS)
     except OSError:
         pass
 
 
+def write_status(c, start, end, st, noise):
+    write_status_raw({"mode": "scan", "config": c["name"], "proto": c["proto"], "freq": c["freq"], "sf": c["sf"],
+                      "bw": c["bw"], "start": start, "end": end, "stats": st, "noise": noise[-1] if noise else None,
+                      "noise_hist": NOISE_HIST[-120:]})
+
+
+def load_config():
+    cfg = json.load(open(CFG)) if os.path.exists(CFG) else {}
+    configs = cfg.get("configs") or DEFAULT_CONFIGS
+    for c in configs:
+        c["sync"] = int(c["sync"], 16) if isinstance(c["sync"], str) else c["sync"]
+    cfg["configs"] = configs
+    return cfg
+
+
+def mode_reader(cfg):
+    default = cfg.get("default_mode", "chat")
+
+    def mode_of():
+        try:
+            m = (CTL / "mode").read_text().strip()
+            return m if m in ("chat", "scan") else default
+        except OSError:
+            return default
+    return mode_of
+
+
 def main():
     global RUNNING
     signal.signal(signal.SIGTERM, lambda *_: globals().__setitem__("RUNNING", False))
-    configs = DEFAULT_CONFIGS
-    if os.path.exists(CFG):
-        configs = json.load(open(CFG))["configs"]
-        for c in configs:
-            c["sync"] = int(c["sync"], 16) if isinstance(c["sync"], str) else c["sync"]
+    cfg = load_config(); configs = cfg["configs"]; mode_of = mode_reader(cfg)
     os.makedirs(os.path.dirname(DB), exist_ok=True)
-    db = sqlite3.connect(DB); db.executescript(SCHEMA); db.commit()
+    CTL.mkdir(parents=True, exist_ok=True)
+    db = sqlite3.connect(DB); db.executescript(SCHEMA); migrate(db)
+    if mode_of() == "chat" and "--scan" not in sys.argv:
+        import asyncio, logging, meshscan_chat
+        logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
+        logging.getLogger("meshscan.chat").setLevel(logging.INFO)
+        print("[mode] chat", flush=True)
+        asyncio.run(meshscan_chat.run_chat(sys.modules[__name__], cfg, db, CTL,
+                                           lambda: mode_of() if RUNNING else "stop"))
+        return  # systemd (Restart=always) starts us again in the new mode
+    print("[mode] scan", flush=True)
     once = "--once" in sys.argv
     r = SX1262()
     try:
-        while RUNNING:
+        while RUNNING and mode_of() == "scan":
             for c in configs:
-                if not RUNNING:
+                if not RUNNING or mode_of() != "scan":
                     break
                 r.configure(c)
                 start = time.time(); end = start + c["dwell"]
                 st = dict(packets=0, crc=0, hdr_err=0, pre=0, hdr=0); noise = []; last_n = time.time(); last_s = 0  # skip the settling sample
                 print(f"[{time.strftime('%H:%M:%S')}] listen {c['name']} {c['freq']}MHz SF{c['sf']} BW{c['bw']} sync 0x{c['sync']:02X} {c['dwell']}s", flush=True)
+                last_m = time.time()
                 while RUNNING and time.time() < end:
+                    if time.time() - last_m > 1:
+                        last_m = time.time()
+                        if mode_of() != "scan":
+                            break
                     irq = r.irq()
                     if irq & 0x0004: st["pre"] += 1
                     if irq & 0x0010: st["hdr"] += 1

@@ -78,7 +78,7 @@ header{display:flex;align-items:center;gap:14px;height:44px}
 button.pill{cursor:pointer;font:inherit;font-size:12.5px;color:var(--muted)}
 button.pill:hover{color:var(--text);border-color:var(--line-2)}
 .radio{left:16px;bottom:16px;width:360px;border-radius:12px;padding:14px 16px}
-.radio .top{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;height:16px}
+.radio .top{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;height:16px;white-space:nowrap;overflow:hidden}
 .radio .top .rf{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--dim)}
 .radio .name{font-size:18px;font-weight:650;letter-spacing:-.02em;margin-top:6px;line-height:24px}
 .bar{height:4px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden;margin-top:10px}
@@ -125,7 +125,6 @@ button.pill:hover{color:var(--text);border-color:var(--line-2)}
 .sv{display:inline-flex;align-items:center;gap:7px}
 
 /* nodes table */
-.lower{height:560px}
 .seg{display:inline-flex;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:9px;padding:2px;height:30px}
 .seg button{all:unset;cursor:pointer;padding:0 10px;border-radius:7px;font-size:12px;color:var(--muted);display:flex;align-items:center}
 .seg button.on{background:rgba(255,255,255,.08);color:var(--text)}
@@ -170,23 +169,63 @@ tbody tr:hover{background:rgba(255,255,255,.025)}
 .lists{height:auto}
 #stats .brow{grid-template-columns:176px minmax(0,1fr) 72px}
 
+/* mode switch */
+.modeseg{display:inline-flex;height:32px;padding:2px;border-radius:999px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+.modeseg button{all:unset;cursor:pointer;display:flex;align-items:center;gap:6px;padding:0 12px;border-radius:999px;font-size:12.5px;color:var(--muted)}
+.modeseg button.on{background:rgba(255,255,255,.08);color:var(--text)}
+.modeseg button.pending{animation:pend 1s ease-in-out infinite}
+@keyframes pend{50%{opacity:.45}}
+/* chat */
+.lower{height:600px}
+.tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;min-width:0}
+.tabs::-webkit-scrollbar{display:none}
+.tab{all:unset;cursor:pointer;height:28px;padding:0 10px;border-radius:8px;font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:6px;white-space:nowrap}
+.tab:hover{color:var(--text)}
+.tab.on{background:rgba(255,255,255,.07);color:var(--text)}
+.tab .c{font-size:11px;color:var(--dim)}
+.who-chip{margin-left:auto;flex:none;font-size:11.5px;color:var(--dim);font-family:var(--mono)}
+#thread{padding:18px 20px 8px;display:flex;flex-direction:column;gap:14px}
+.day{align-self:center;font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;padding:2px 10px;border:1px solid var(--line);border-radius:999px}
+.row{display:grid;grid-template-columns:32px minmax(0,1fr);gap:10px;align-items:start;max-width:90%}
+.row.me{margin-left:auto;grid-template-columns:minmax(0,1fr);justify-items:end}
+.row .av{margin-top:18px}
+.bh{display:flex;gap:8px;align-items:baseline;font-size:12px;margin-bottom:4px;min-width:0}
+.bh .who{font-weight:600;color:var(--text);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bh .t{color:var(--dim);flex:none}
+.bub{padding:9px 13px;border-radius:4px 14px 14px 14px;background:rgba(255,255,255,.045);border:1px solid var(--line);color:#d8dee7;overflow-wrap:anywhere;white-space:pre-wrap;line-height:1.45}
+.me .bub{border-radius:14px 4px 14px 14px;background:linear-gradient(180deg,rgba(94,177,255,.30),rgba(94,177,255,.18));border-color:rgba(94,177,255,.38);color:#f1f7ff}
+.bm{display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--dim);margin-top:5px}
+.bm .ok{color:var(--mt)}.bm .bad{color:var(--bad)}
+.composer{flex:none;display:flex;gap:10px;align-items:center;padding:12px 16px;border-top:1px solid var(--line);background:rgba(0,0,0,.18)}
+.composer input{all:unset;flex:1;min-width:0;height:40px;padding:0 14px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--line);font-size:13.5px;color:var(--text);box-sizing:border-box}
+.composer input::placeholder{color:var(--dim)}
+.composer input:focus{border-color:rgba(94,177,255,.55);box-shadow:0 0 0 3px rgba(94,177,255,.12)}
+.composer .cnt{font-size:11.5px;color:var(--dim);width:52px;text-align:right;flex:none}
+.composer .cnt.over{color:var(--bad)}
+.send{all:unset;cursor:pointer;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--mc);color:#04121f;flex:none;transition:transform .1s}
+.send:active{transform:scale(.94)}
+.send[disabled]{opacity:.3;cursor:not-allowed}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:rgba(20,12,16,.96);border:1px solid rgba(255,107,129,.4);color:#ffd5dc;padding:10px 16px;border-radius:12px;font-size:13px;z-index:50;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:1}
 footer{color:var(--dim);font-size:12px;text-align:center;margin-top:8px}
 footer a{color:var(--muted);text-decoration:none}footer a:hover{color:var(--text)}
 
 @media (max-width:1120px){
   .cols{grid-template-columns:minmax(0,1fr)}
   .stage{height:auto}#mapcard{height:560px}#feedcard{height:460px}
-  .lower{height:auto}#nodescard{height:520px}#msgcard{height:440px}
+  .lower{height:auto}#nodescard{height:520px}#chatcard{height:600px}
   .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (max-width:640px){
   .wrap{padding:14px 12px 28px;gap:12px}.cols,.kpis{gap:12px}
   header .clock{display:none}
+  .modeseg button{padding:0 10px}
   .brand p{display:none}.lg{display:none}.sm{display:inline}
   .kpi{height:104px;padding:14px 16px}.kpi .val{font-size:24px;line-height:28px}
   #mapcard{height:auto}#map{height:380px;flex:none}
   .radio{position:static;width:auto;border-radius:0;border:0;border-top:1px solid var(--line);background:transparent;backdrop-filter:none}
   .legend .pill.cnt{display:none}
+  .who-chip{display:none}#thread{padding:14px 14px 6px}.row{max-width:96%}.composer{padding:10px 12px}
   .hide-sm{display:none}
   .hd{padding:0 16px}#feed li{padding:0 16px;grid-template-columns:72px minmax(0,1fr) 64px}
   th:first-child,td:first-child{padding-left:16px}th:last-child,td:last-child{padding-right:16px}
@@ -202,6 +241,7 @@ footer a{color:var(--muted);text-decoration:none}footer a:hover{color:var(--text
   <div class="brand"><h1>meshscan</h1><p>CardputerZero · Cap LoRa-1262 · receive-only</p></div>
   <div class="spacer"></div>
   <span class="pill clock num" id="clock">--:--:--</span>
+  <div class="modeseg" id="modeseg"><button data-m="chat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v11H8l-4 4z"/></svg>Chat</button><button data-m="scan"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h3l3-8 4 16 3-8h7"/></svg>Scan</button></div>
   <span class="pill live off" id="live"><span class="dot"></span><b>CONNECTING</b></span>
 </header>
 
@@ -222,14 +262,14 @@ footer a{color:var(--muted);text-decoration:none}footer a:hover{color:var(--text
       <button class="pill glass" id="fit" title="Fit all nodes"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span class="num" id="mapcount">0</span></button>
     </div>
     <div class="ov radio glass">
-      <div class="top"><span class="dot" id="r-dot" style="background:var(--mc)"></span>Now listening<span class="rf" id="r-rf"></span></div>
+      <div class="top"><span class="dot" id="r-dot" style="background:var(--mc)"></span><span id="r-what">Now listening</span><span class="rf" id="r-rf"></span></div>
       <div class="name" id="r-name">–</div>
       <div class="bar"><i id="r-bar" style="width:0"></i></div>
       <div class="meta num">
         <div><span>Packets</span><b id="r-pk">0</b></div>
-        <div><span>Preambles</span><b id="r-pre">0</b></div>
+        <div><span id="r-l2">Preambles</span><b id="r-pre">0</b></div>
         <div><span>Noise</span><b id="r-noise">–</b></div>
-        <div><span>Next hop</span><b id="r-left">–</b></div>
+        <div><span id="r-l4">Next hop</span><b id="r-left">–</b></div>
       </div>
       <svg class="spark" id="r-spark" viewBox="0 0 300 36" preserveAspectRatio="none"></svg>
     </div>
@@ -250,9 +290,14 @@ footer a{color:var(--muted);text-decoration:none}footer a:hover{color:var(--text
       <thead><tr><th>Name</th><th class="hide-sm">Type</th><th>Signal</th><th class="r hide-sm">Pkts</th><th class="r">Seen</th></tr></thead>
       <tbody id="nodes"></tbody></table></div>
   </div>
-  <div class="card" id="msgcard">
-    <div class="hd"><h2>Messages</h2><span class="sub">public channels</span></div>
-    <div class="body" id="msgs"></div>
+  <div class="card" id="chatcard">
+    <div class="hd"><h2>Chat</h2><div class="tabs" id="tabs"></div><span class="who-chip" id="whochip"></span></div>
+    <div class="body" id="chatbody"><div id="thread"></div></div>
+    <form class="composer" id="composer" autocomplete="off">
+      <input id="msgin" maxlength="200" placeholder="Message">
+      <span class="cnt num" id="msgcnt">0/140</span>
+      <button class="send" id="sendbtn" type="submit" title="Send" disabled><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></svg></button>
+    </form>
   </div>
 </section>
 
@@ -266,7 +311,8 @@ footer a{color:var(--muted);text-decoration:none}footer a:hover{color:var(--text
     <div class="blist" id="stats"></div>
   </div>
 </section>
-<footer>meshscan never transmits · <a href="https://github.com/mfiumara/meshscan-zero">github.com/mfiumara/meshscan-zero</a></footer>
+<div class="toast" id="toast"></div>
+<footer>meshscan transmits only what you send from Chat · <a href="https://github.com/mfiumara/meshscan-zero">github.com/mfiumara/meshscan-zero</a></footer>
 </div>
 
 <script>
@@ -367,10 +413,7 @@ async function loadSide(){
   $('#hops').innerHTML=hops.length?hops.slice(0,5).map(h=>`<div class="brow"><span class="n mono">${sig(h.last_snr,HEX.meshcore)}${esc(h.id)}</span><span class="b"><i style="width:${100*h.packets/hm}%;background:linear-gradient(90deg,rgba(94,177,255,.45),var(--mc))"></i></span><span class="v num"><b>${h.packets.toLocaleString()}</b><small>${fx(h.last_rssi)} dBm</small></span></div>`).join(''):'<div class="empty">No relayed packets yet.</div>';
   const sm=Math.max(1,...stats.map(s=>s.packets));
   $('#stats').innerHTML=stats.length?stats.map(s=>`<div class="brow"><span class="n"><span class="dot" style="width:7px;height:7px;background:${HEX[protoOf(s.config)]}"></span>${esc(pretty(s.config))}</span><span class="b"><i style="width:${100*s.packets/sm}%;background:${HEX[protoOf(s.config)]}"></i></span><span class="v num"><b>${s.packets.toLocaleString()}</b><small>${Math.round(s.secs/60)} min</small></span></div>`).join(''):'<div class="empty">Waiting for the first full listening slot.</div>';
-  $('#msgs').innerHTML=msgs.length?msgs.map(m=>{const {who,txt}=splitMsg(m),h=hue(who);
-    return `<div class="msg"><div class="av" style="background:hsl(${h} 70% 72%)">${esc([...who.replace(/[^\p{L}\p{N}]/gu,'')].slice(0,2).join('').toUpperCase()||'?')}</div>
-    <div style="min-width:0"><div class="m1"><span class="who">${esc(who)}</span><span class="ch">#${esc(m.channel||'?')}</span><span class="when ago-c num" data-t="${m.ts}">${ago(m.ts)}</span></div><div class="m2">${esc(txt)}</div></div></div>`}).join('')
-    :'<div class="empty">Nothing decoded yet. Only public channels can be read.</div>';
+  msgs.forEach(m=>MSGS.set(m.id,m));renderChat();
 }
 
 /* ---------------- feed ---------------- */
@@ -395,17 +438,66 @@ async function loadFeed(){const ps=await j('/api/packets');$('#feed').innerHTML=
 /* ---------------- radio status ---------------- */
 let ST=null;
 function renderStatus(){
-  if(!ST||!ST.config)return;const c=HEX[ST.proto];
+  if(!ST||!ST.config)return;const c=HEX[ST.proto];MODE=ST.mode||'scan';renderMode();
+  if(MODE==='chat'){
+    $('#r-what').textContent='Chat node';$('#r-name').textContent=pretty(ST.config);$('#r-dot').style.background=c;
+    $('#r-rf').textContent=`${ST.freq} MHz · SF${ST.sf} · ${ST.bw} kHz`;$('#r-bar').style.width='100%';
+    $('#r-l2').textContent='Sent';$('#r-l4').textContent='Region';
+    $('#r-pk').textContent=ST.stats.packets;$('#r-pre').textContent=ST.stats.tx??0;$('#r-left').textContent='#'+(ST.node?.scope||'–');
+    $('#r-noise').textContent=ST.noise!=null?fx(ST.noise)+' dBm':'–';sparkline(c);return}
+  $('#r-what').textContent='Now listening';$('#r-l2').textContent='Preambles';$('#r-l4').textContent='Next hop';
   $('#r-name').textContent=pretty(ST.config);$('#r-dot').style.background=c;
   $('#r-rf').textContent=`${ST.freq} MHz · SF${ST.sf} · ${ST.bw} kHz`;
   const tot=ST.end-ST.start,el=Math.min(tot,now()-ST.start);$('#r-bar').style.width=(100*el/tot)+'%';
   const left=Math.max(0,ST.end-now());$('#r-left').textContent=`${Math.floor(left/60)}:${String(Math.floor(left%60)).padStart(2,'0')}`;
   $('#r-pk').textContent=ST.stats.packets;$('#r-pre').textContent=ST.stats.pre;$('#r-noise').textContent=ST.noise!=null?fx(ST.noise)+' dBm':'–';
+  sparkline(c)}
+function sparkline(c){
   const h=(ST.noise_hist||[]).slice(-90);if(h.length>1){const vs=h.map(x=>x[1]),lo=Math.min(...vs)-1,hi=Math.max(...vs)+1,W=300,H=36;
     const xy=h.map((x,i)=>[i*W/(h.length-1),H-(x[1]-lo)/(hi-lo)*(H-4)-2]);
     const line=xy.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
     $('#r-spark').innerHTML=`<defs><linearGradient id="ng" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${c}" stop-opacity=".3"/><stop offset="1" stop-color="${c}" stop-opacity="0"/></linearGradient></defs><path d="${line} L${W} ${H} L0 ${H}Z" fill="url(#ng)"/><path d="${line}" fill="none" stroke="${c}" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`}
 }
+
+/* ---------------- chat ---------------- */
+let MSGS=new Map(),CH='Public',MODE=null,wantMode=null,stickNext=true;
+const hm=t=>new Date(t*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+const dayOf=t=>new Date(t*1000).toDateString();
+function nodeChannels(){return ST?.node?.channels||[]}
+function chanList(){const s=new Set(nodeChannels().map(c=>c.name));if(!s.size)s.add('Public');for(const m of MSGS.values())if(m.channel&&m.proto==='meshcore')s.add(m.channel);return[...s]}
+function chanIdx(){const c=nodeChannels().find(c=>c.name===CH);return c?c.idx:null}
+function renderTabs(){const chs=chanList();if(!chs.includes(CH))CH=chs[0];
+  const cnt=n=>[...MSGS.values()].filter(m=>m.channel===n).length;
+  $('#tabs').innerHTML=chs.map(c=>`<button class="tab ${c===CH?'on':''}" data-c="${esc(c)}">#${esc(c)}<span class="c num">${cnt(c)}</span></button>`).join('')}
+$('#tabs').addEventListener('click',e=>{const b=e.target.closest('.tab');if(!b)return;CH=b.dataset.c;stickNext=true;renderChat()});
+function bubble(m){
+  const me=m.direction==='out';const sp=m.src?{who:m.src,txt:m.text}:splitMsg(m);const who=sp.who;m={...m,text:sp.txt};
+  if(me){const st=m.status==='repeated'?`<span class="ok">✓✓ heard repeated ${m.repeats}×</span>`:m.status==='sent'?'<span>✓ sent · waiting for a repeat</span>':m.status==='failed'?'<span class="bad">failed to send</span>':'<span>sending…</span>';
+    return `<div class="row me"><div><div class="bub">${esc(m.text)}</div><div class="bm" style="justify-content:flex-end">${st}<span class="num">${hm(m.ts)}</span></div></div></div>`}
+  const h=hue(who),ini=esc([...who.replace(/[^\p{L}\p{N}]/gu,'')].slice(0,2).join('').toUpperCase()||'?');
+  return `<div class="row"><div class="av" style="background:hsl(${h} 70% 72%)">${ini}</div><div style="min-width:0"><div class="bh"><span class="who">${esc(who)}</span><span class="t num">${hm(m.ts)}</span></div>
+  <div class="bub">${esc(m.text)}</div><div class="bm">${m.snr!=null?sig(m.snr,HEX.meshcore):''}${m.rssi!=null?`<span class="num">${fx(m.rssi)} dBm</span>`:''}${m.hops!=null?`<span>${m.hops} hop${m.hops==1?'':'s'}</span>`:''}</div></div></div>`}
+function renderChat(){
+  renderTabs();const body=$('#chatbody');const near=body.scrollHeight-body.scrollTop-body.clientHeight<120;
+  const list=[...MSGS.values()].filter(m=>m.channel===CH).sort((a,b)=>a.ts-b.ts).slice(-200);let day='',html='';
+  for(const m of list){const d=dayOf(m.ts);if(d!==day){day=d;html+=`<div class="day">${d===new Date().toDateString()?'Today':esc(new Date(m.ts*1000).toLocaleDateString([],{weekday:'short',day:'numeric',month:'short'}))}</div>`}html+=bubble(m)}
+  $('#thread').innerHTML=html||`<div class="empty">No messages on #${esc(CH)} yet.</div>`;
+  if(near||stickNext){body.scrollTop=body.scrollHeight;stickNext=false}
+  renderComposer()}
+function renderComposer(){const idx=chanIdx(),on=MODE==='chat'&&idx!=null;const inp=$('#msgin');
+  inp.disabled=!on;inp.placeholder=MODE!=='chat'?'Switch to Chat mode to send':idx==null?`#${CH} is receive-only here`:`Message #${CH} as ${ST?.node?.name||''}`;
+  const n=new TextEncoder().encode(inp.value).length;$('#msgcnt').textContent=n+'/140';$('#msgcnt').classList.toggle('over',n>140);
+  $('#sendbtn').disabled=!on||!inp.value.trim()||n>140;
+  $('#whochip').textContent=MODE==='chat'&&ST?.node?`${ST.node.name} · #${ST.node.scope}`:''}
+$('#msgin').addEventListener('input',renderComposer);
+function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('on');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('on'),3500)}
+$('#composer').addEventListener('submit',async e=>{e.preventDefault();const inp=$('#msgin'),text=inp.value.trim(),idx=chanIdx();if(!text||idx==null)return;
+  $('#sendbtn').disabled=true;
+  try{const r=await fetch('/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,channel:idx})});const o=await r.json();
+    if(!r.ok)throw new Error(o.error||r.status);inp.value='';stickNext=true}catch(err){toast('Not sent: '+err.message)}renderComposer()});
+function renderMode(){document.querySelectorAll('#modeseg button').forEach(b=>{b.classList.toggle('on',b.dataset.m===MODE);b.classList.toggle('pending',wantMode&&b.dataset.m===wantMode&&wantMode!==MODE)});if(wantMode===MODE)wantMode=null;renderComposer()}
+$('#modeseg').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b||b.dataset.m===MODE)return;wantMode=b.dataset.m;renderMode();
+  try{const r=await fetch('/api/mode',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:wantMode})});if(!r.ok)throw new Error((await r.json()).error)}catch(err){wantMode=null;renderMode();toast('Mode switch failed: '+err.message)}});
 
 /* ---------------- live stream ---------------- */
 let es,refreshT,sideT,lastPkt=0;
@@ -413,7 +505,8 @@ function connect(){
   es=new EventSource('/api/stream?since='+maxId);
   es.onopen=()=>{$('#live').classList.remove('off');$('#live b').textContent='LIVE'};
   es.onerror=()=>{$('#live').classList.add('off');$('#live b').textContent='RECONNECTING'};
-  es.addEventListener('status',e=>{ST=JSON.parse(e.data);renderStatus()});
+  es.addEventListener('status',e=>{const had=JSON.stringify(ST?.node?.channels);ST=JSON.parse(e.data);renderStatus();if(JSON.stringify(ST?.node?.channels)!==had)renderChat()});
+  es.addEventListener('message',e=>{const m=JSON.parse(e.data);MSGS.set(m.id,m);renderChat()});
   es.addEventListener('packet',e=>{const p=JSON.parse(e.data);if(p.id<=maxId)return;maxId=p.id;lastPkt=p.ts;addPkt(p,true);
     clearTimeout(refreshT);refreshT=setTimeout(()=>{loadSummary();loadNodes()},600);
     if(!sideT)sideT=setTimeout(()=>{sideT=null;loadSide()},5000)});

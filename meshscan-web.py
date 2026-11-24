@@ -11,7 +11,9 @@ from urllib.parse import urlparse, parse_qs
 
 DB = os.environ.get("MESHSCAN_DB", "/var/lib/meshscan/meshscan.db")
 STATUS = os.path.join(os.path.dirname(DB), "status.json")
+CTL = os.path.join(os.path.dirname(DB), "ctl")
 PORT = int(os.environ.get("MESHSCAN_WEB_PORT", "8080"))
+MAX_TEXT = 140  # bytes; MeshCore group text also carries "<name>: " inside the same frame
 HERE = os.path.dirname(os.path.abspath(__file__))
 INDEX = next(p for p in (os.path.join(HERE, "web", "index.html"), os.path.join(HERE, "index.html")) if os.path.exists(p))
 
@@ -50,7 +52,7 @@ def api(path, qs):
     if path == "/api/packets":
         return q(f"SELECT {PKT_COLS} FROM packets ORDER BY id DESC LIMIT 80")
     if path == "/api/messages":
-        return q("SELECT * FROM messages ORDER BY ts DESC LIMIT 50")
+        return q("SELECT * FROM messages ORDER BY ts DESC LIMIT 200")
     if path == "/api/status":
         return status()
     if path == "/api/summary":
@@ -61,6 +63,36 @@ def api(path, qs):
         r["messages"] = q("SELECT COUNT(*) n FROM messages")[0]["n"]
         return r
     return None
+
+
+def write_ctl(name, data):
+    os.makedirs(os.path.join(CTL, "outbox"), exist_ok=True)
+    path = os.path.join(CTL, name)
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        f.write(data)
+    os.replace(tmp, path)
+
+
+def post(path, body):
+    if path == "/api/mode":
+        mode = body.get("mode")
+        if mode not in ("chat", "scan"):
+            return 400, {"error": "mode must be chat or scan"}
+        write_ctl("mode", mode)
+        return 200, {"ok": True, "mode": mode}
+    if path == "/api/send":
+        text = str(body.get("text", "")).strip()
+        if not text:
+            return 400, {"error": "empty message"}
+        if len(text.encode()) > MAX_TEXT:
+            return 400, {"error": f"message is longer than {MAX_TEXT} bytes"}
+        if status().get("mode") != "chat":
+            return 409, {"error": "radio is in scan mode"}
+        job = {"text": text, "channel": int(body.get("channel", 0))}
+        write_ctl(os.path.join("outbox", f"{time.time_ns()}.json"), json.dumps(job))
+        return 202, {"ok": True}
+    return 404, {"error": "not found"}
 
 
 class H(BaseHTTPRequestHandler):
@@ -79,6 +111,7 @@ class H(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/event-stream"); self.send_header("Cache-Control", "no-store")
         self.send_header("Connection", "keep-alive"); self.end_headers()
         last = int(qs.get("since", ["0"])[0]) or (q("SELECT COALESCE(MAX(id),0) m FROM packets")[0]["m"])
+        last_msg = q("SELECT COALESCE(MAX(updated),0) m FROM messages")[0]["m"]
         last_status = 0; last_beat = time.time()
         try:
             while True:
@@ -86,6 +119,9 @@ class H(BaseHTTPRequestHandler):
                 for r in rows:
                     last = r["id"]
                     self.wfile.write(f"event: packet\ndata: {json.dumps(r)}\n\n".encode())
+                for m in q("SELECT * FROM messages WHERE updated>? ORDER BY updated LIMIT 50", (last_msg,)):
+                    last_msg = max(last_msg, m["updated"] or 0)
+                    self.wfile.write(f"event: message\ndata: {json.dumps(m)}\n\n".encode())
                 st = status()
                 if st.get("ts", 0) != last_status:
                     last_status = st.get("ts", 0)
@@ -96,6 +132,18 @@ class H(BaseHTTPRequestHandler):
                 time.sleep(0.5)
         except (BrokenPipeError, ConnectionResetError, OSError):
             return
+
+    def do_POST(self):
+        u = urlparse(self.path)
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+            if n > 4096:
+                return self.send(413, b'{"error":"too large"}', "application/json")
+            body = json.loads(self.rfile.read(n) or b"{}")
+            code, out = post(u.path, body if isinstance(body, dict) else {})
+        except (ValueError, OSError) as e:
+            code, out = 400, {"error": str(e)}
+        self.send(code, json.dumps(out).encode(), "application/json")
 
     def do_GET(self):
         u = urlparse(self.path); qs = parse_qs(u.query)
