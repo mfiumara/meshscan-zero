@@ -31,6 +31,7 @@ BIG = ImageFont.truetype(os.path.join(FONTS, 'Inter.ttf'), 23)
 MONO = ImageFont.truetype(os.path.join(FONTS, 'JetBrainsMono.ttf'), 9)
 SMALL = ImageFont.truetype(os.path.join(FONTS, 'JetBrainsMono.ttf'), 7)
 ATTR = ImageFont.truetype(os.path.join(FONTS, 'Inter.ttf'), 6)
+PRESET_FONTS = [BOLD] + [ImageFont.truetype(os.path.join(FONTS, 'Inter.ttf'), n) for n in (10, 9)]
 for font in (BOLD, BIG):
     font.set_variation_by_name('Bold')
 
@@ -321,7 +322,9 @@ def build_map_panel(data, nodes, selected, now, home, on_map):
     d.text((11,6), mode if mode in ('CHAT','SCAN') else '----', font=MONO, fill=accent)
     d.ellipse((65,10,69,14), fill=GREEN if online else (255,184,107))
     d.text((73,6), 'LIVE' if online else 'OFFLINE', font=MONO, fill=GREEN if online else (255,184,107))
-    d.text((7,23), clip(preset_name(status.get('config')), 118, BOLD), font=BOLD, fill=TEXT)
+    name = preset_name(status.get('config'))
+    pf = next((f for f in PRESET_FONTS if f.getlength(name) <= 118), PRESET_FONTS[-1])
+    d.text((7, 23 + (11 - pf.size)//2), clip(name, 118, pf), font=pf, fill=TEXT)
     freq = status.get('freq')
     desc = '%s MHz / SF%s' % (freq, status.get('sf','?')) if freq is not None else 'Waiting for API'
     d.text((7,37), clip(desc, 118, SMALL), font=SMALL, fill=MUTED)
