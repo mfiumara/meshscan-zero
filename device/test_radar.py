@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Small device-side regression tests; no access to the real meshscan service."""
+import os
 import http.server
 import json
 import threading
@@ -11,14 +12,24 @@ import radar
 
 
 class RadarTests(unittest.TestCase):
+    def test_home_override_and_presets(self):
+        with patch.dict(os.environ, {'RADAR_HOME': '52.37,4.89'}):
+            self.assertEqual(radar.home_override(), {'lat': 52.37, 'lon': 4.89})
+        with patch.dict(os.environ, {'RADAR_HOME': '91,4'}):
+            self.assertIsNone(radar.home_override())
+        self.assertEqual(radar.preset_name('meshcore_nl_sf7'), 'MeshCore NL')
+        self.assertEqual(radar.preset_name('meshtastic_longfast'), 'Meshtastic LongFast')
+        self.assertNotIn('_', radar.preset_name('meshcore_future_sf12'))
+        self.assertEqual(radar.clip('Mesh 🇳🇱 node', 100, radar.FONT), 'Mesh  node')
+
     def test_position(self):
         node = {'node_id': 'abc', 'last_rssi': -80}
         self.assertEqual(radar.position(node, None), radar.position(node, None))
         near = radar.position(node, None)
         far = radar.position(dict(node, last_rssi=-120), None)
-        self.assertLess((near[0]-82)**2 + (near[1]-85)**2, (far[0]-82)**2 + (far[1]-85)**2)
+        self.assertLess((near[0]-radar.CX)**2 + (near[1]-radar.CY)**2, (far[0]-radar.CX)**2 + (far[1]-radar.CY)**2)
         north = radar.position(dict(node, lat=52.1, lon=5), {'lat': 52, 'lon': 5})
-        self.assertAlmostEqual(north[0], 82, places=5)
+        self.assertAlmostEqual(north[0], radar.CX, places=5)
         self.assertLess(north[1], 85)
 
     def test_event_and_empty_render(self):

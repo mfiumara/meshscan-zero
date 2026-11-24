@@ -3,8 +3,9 @@
 set -eu
 [ "$(id -u)" = 0 ] || { echo 'Run with sudo' >&2; exit 1; }
 HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-install -d /opt/meshscan-radar /usr/share/APPLaunch/applications /usr/share/APPLaunch/share/images
+install -d /opt/meshscan-radar /opt/meshscan-radar/fonts /usr/share/APPLaunch/applications /usr/share/APPLaunch/share/images
 install -m 755 "$HERE/radar.py" /opt/meshscan-radar/radar.py
+install -m 644 "$HERE"/fonts/* /opt/meshscan-radar/fonts/
 if [ ! -x /opt/meshscan-radar/venv/bin/python ]; then
     python3 -m venv --system-site-packages /opt/meshscan-radar/venv
 fi

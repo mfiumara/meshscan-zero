@@ -67,10 +67,14 @@ The optional **Mesh Radar** APPLaunch app shows a sweeping scope, live packet/no
 sudo ./device/install-radar.sh
 ```
 
-Launch **Mesh Radar** from APPLaunch. **Shift+Q** toggles the full-screen dashboard QR; **Space** or **Tab** cycles nodes by signal strength; **Esc** or lowercase **q** exits. The dashboard URL is also visible in the QR view. The installer uses a separate venv under `/opt/meshscan-radar` and does not restart meshscan services.
+Launch **Mesh Radar** from APPLaunch. **Shift+Q** toggles the full-screen dashboard QR; **Space** or **Tab** cycles nodes by signal strength; **Esc** or lowercase **q** exits. The dashboard URL is also visible in the QR view. The installer uses a separate venv under `/opt/meshscan-radar` and does not restart meshscan services. If the launcher has not refreshed its app list, restart the user `APPLaunch.service` or log in again.
+
+For diagnostic runs, `RADAR_HOME=52.37,4.89` overrides the home coordinates for that process only; it never modifies meshscan settings. The bundled Inter and JetBrains Mono fonts are distributed under the SIL Open Font License (licences in `device/fonts/`).
 
 ![On-device radar](docs/radar.png)
 ![Dashboard QR](docs/radar-qr.png)
+![Bearing mode with a diagnostic home override](docs/radar-bearing.png)
+![Mesh Radar in APPLaunch](docs/radar-launcher.png)
 
 ## Hardware notes
 

@@ -18,17 +18,21 @@ import urllib.request
 
 import numpy as np
 import qrcode
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 BASE = 'http://127.0.0.1:8080'
 W, H = 320, 170
 BLUE, GREEN, PURPLE = (94, 177, 255), (79, 220, 152), (185, 150, 255)
 TEXT, MUTED = (232, 236, 242), (139, 148, 163)
-FONTS = '/usr/share/fonts/truetype/dejavu/'
-FONT = ImageFont.truetype(FONTS + 'DejaVuSans.ttf', 9)
-BOLD = ImageFont.truetype(FONTS + 'DejaVuSans-Bold.ttf', 10)
-BIG = ImageFont.truetype(FONTS + 'DejaVuSans-Bold.ttf', 19)
-MONO = ImageFont.truetype(FONTS + 'DejaVuSansMono.ttf', 8)
+FONTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fonts')
+FONT = ImageFont.truetype(os.path.join(FONTS, 'Inter.ttf'), 10)
+BOLD = ImageFont.truetype(os.path.join(FONTS, 'Inter.ttf'), 11)
+BIG = ImageFont.truetype(os.path.join(FONTS, 'Inter.ttf'), 23)
+MONO = ImageFont.truetype(os.path.join(FONTS, 'JetBrainsMono.ttf'), 9)
+SMALL = ImageFont.truetype(os.path.join(FONTS, 'JetBrainsMono.ttf'), 7)
+for font in (BOLD, BIG):
+    font.set_variation_by_name('Bold')
+CX, CY, RADIUS = 85, 85, 78
 
 
 def get(path):
@@ -68,7 +72,7 @@ def position(node, home):
         rssi = node.get('last_rssi')
         rssi = rssi if isinstance(rssi, (int, float)) else -115
         radius = max(8, min(70, 12 + (-rssi - 45) * .8))
-    return 82 + math.sin(angle)*radius, 85 - math.cos(angle)*radius, angle
+    return CX + math.sin(angle)*radius, CY - math.cos(angle)*radius, angle
 
 
 class Data:
@@ -78,6 +82,8 @@ class Data:
         self.online = False
         self.events = []
         self.ticker = 'Listening for packets'
+        self.ticker_kind = 'LISTEN'
+        self.ticker_sender = 'Waiting for traffic'
         threading.Thread(target=self.poll, daemon=True).start()
         threading.Thread(target=self.stream, daemon=True).start()
 
@@ -95,6 +101,11 @@ class Data:
                     self.nodes = nodes if isinstance(nodes, list) else []
                     self.hops = hops if isinstance(hops, list) else []
                     self.messages = messages if isinstance(messages, list) else []
+                    if self.ticker_kind == 'LISTEN' and self.messages and isinstance(self.messages[0], dict):
+                        recent = self.messages[0]
+                        self.ticker_kind = 'MESSAGE'
+                        self.ticker_sender = str(recent.get('src') or 'Unknown sender')
+                        self.ticker = str(recent.get('text') or 'New message').replace('\n', ' ')
                     self.settings = settings if isinstance(settings, dict) else {}
                     self.online = True
             except (OSError, ValueError, TypeError):
@@ -133,6 +144,8 @@ class Data:
                 self.status = value
             elif event == 'message':
                 self.ticker = str(value.get('text') or 'New message').replace('\n', ' ')
+                self.ticker_kind = 'MESSAGE'
+                self.ticker_sender = str(value.get('src') or 'New message')
             elif event == 'packet':
                 decoded = value.get('decoded') or {}
                 if isinstance(decoded, str):
@@ -149,6 +162,9 @@ class Data:
                 self.events.append((time.monotonic(), [str(x).lower() for x in ids if x is not None]))
                 self.events = self.events[-30:]
                 self.ticker = str(decoded.get('type') or 'Packet received').replace('_', ' ').upper()
+                self.ticker_kind = self.ticker
+                self.ticker_sender = str(decoded.get('name') or decoded.get('src') or (path[-1] if isinstance(path, list) and path else 'Unknown origin'))
+                self.ticker_proto = value.get('proto')
 
 
 @functools.lru_cache(maxsize=8)
@@ -167,110 +183,263 @@ def qr_image(url, size):
     return im
 
 
-@functools.lru_cache(maxsize=256)
+@functools.lru_cache(maxsize=512)
 def clip(text, width, font):
-    text = str(text).replace('\n', ' ')
-    while text and font.getlength(text) > width:
+    # The bundled fonts have no emoji glyphs; omit non-BMP emoji and selectors
+    # rather than showing distracting missing-glyph boxes in station names.
+    text = ''.join(ch for ch in str(text).replace('\n', ' ') if ord(ch) <= 0xffff and ch not in ('\ufe0f', '\u200d'))
+    if font.getlength(text) <= width:
+        return text
+    while text and font.getlength(text + '…') > width:
         text = text[:-1]
-    return text
+    return text + '…'
 
 
-def render(data, now, qr_view, selected, url):
-    with data.lock:
-        status, summary, nodes, hops, settings = data.status, data.summary, data.nodes, data.hops, data.settings
-        online, ticker, events, messages = data.online, data.ticker, list(data.events), data.messages
+PRESETS = {
+    'meshcore_nl_sf7': 'MeshCore NL',
+    'meshcore_eu_narrow_sf8': 'MeshCore EU/UK Narrow',
+    'meshcore_us_sf7': 'MeshCore US',
+    'meshtastic_longfast': 'Meshtastic LongFast',
+    'meshtastic_mediumfast': 'Meshtastic MediumFast',
+    'meshtastic_us_longfast': 'Meshtastic US LongFast',
+    'raw_lorawan_868.1_sf7': 'LoRaWAN 868.1',
+}
+
+
+def preset_name(value):
+    value = str(value or '')
+    if value in PRESETS:
+        return PRESETS[value]
+    if value.startswith('meshcore_'):
+        return 'MeshCore · custom'
+    if value.startswith('meshtastic_'):
+        return 'Meshtastic · custom'
+    return 'Raw · custom' if value else 'Waiting for meshscan'
+
+
+def home_override():
+    raw = os.environ.get('RADAR_HOME')
+    if not raw:
+        return None
+    try:
+        lat, lon = map(float, raw.split(','))
+        if -90 <= lat <= 90 and -180 <= lon <= 180:
+            return {'lat': lat, 'lon': lon}
+    except ValueError:
+        pass
+    print('Ignoring invalid RADAR_HOME (expected latitude,longitude)', file=sys.stderr)
+    return None
+
+
+@functools.lru_cache(maxsize=32)
+def glow_sprite(rgb, size):
+    """Cached soft radial glow; alpha is pre-rendered rather than blurred per frame."""
+    extent = size * 4 + 5
+    y, x = np.ogrid[-extent:extent+1, -extent:extent+1]
+    alpha = (np.exp(-(x*x+y*y) / (2*(size*1.4)**2))*90).astype(np.uint8)
+    image = Image.new('RGBA', (2*extent+1, 2*extent+1), rgb + (0,))
+    image.putalpha(Image.fromarray(alpha, 'L'))
+    return image
+
+
+def glow(im, x, y, rgb, size):
+    sprite = glow_sprite(tuple(rgb), size)
+    im.paste(sprite, (int(x)-sprite.width//2, int(y)-sprite.height//2), sprite)
+
+
+def plot_nodes(nodes, hops, home):
+    combined = [n for n in nodes if isinstance(n, dict)]
+    combined += [dict(n, proto='meshcore', kind='relay') for n in hops if isinstance(n, dict)]
+    combined.sort(key=lambda n: n.get('last_rssi') if isinstance(n.get('last_rssi'), (int, float)) else -999, reverse=True)
+    return [(n, *position(n, home)) for n in combined]
+
+
+def build_scope(positions, home):
     im = Image.new('RGB', (W, H), (6, 8, 12))
     d = ImageDraw.Draw(im)
-    if qr_view:
-        qr = qr_image(url, 142)
-        im.paste(qr, (12, (H-qr.height)//2))
-        d.text((169, 25), 'OPEN DASHBOARD', font=BOLD, fill=BLUE)
-        d.text((169, 50), 'Scan to explore', font=FONT, fill=TEXT)
-        d.text((169, 65), 'the live mesh.', font=FONT, fill=MUTED)
-        for i, part in enumerate((url[:19], url[19:])):
-            d.text((169, 92+i*12), part, font=MONO, fill=TEXT)
-        d.text((169, 143), 'SHIFT+Q  BACK', font=MONO, fill=MUTED)
-        return im
-    cx, cy, rad = 82, 85, 76
-    d.ellipse((cx-rad, cy-rad, cx+rad, cy+rad), fill=(8, 16, 23), outline=(32, 65, 79), width=1)
+    d.ellipse((CX-RADIUS, CY-RADIUS, CX+RADIUS, CY+RADIUS), fill=(7, 17, 22), outline=(43, 77, 85))
+    # Subtle static CRT grid and alternating scanlines, clipped inside the circle.
+    for y in range(CY-RADIUS+3, CY+RADIUS-2, 3):
+        span = int(math.sqrt(max(0, (RADIUS-2)**2 - (y-CY)**2)))
+        d.line((CX-span, y, CX+span, y), fill=(8, 19, 24))
     for r in (19, 38, 57):
-        d.ellipse((cx-r, cy-r, cx+r, cy+r), outline=(21, 43, 52))
-    d.line((cx-rad, cy, cx+rad, cy), fill=(20, 41, 51))
-    d.line((cx, cy-rad, cx, cy+rad), fill=(20, 41, 51))
-    sweep = (now * .8) % math.tau
-    for i in range(40, 0, -1):
-        a = sweep - i * .015
-        intensity = int(7 + 24*(1-i/40))
-        d.line((cx, cy, cx+rad*math.sin(a), cy-rad*math.cos(a)), fill=(intensity//3, intensity, int(intensity*1.2)))
-    d.line((cx, cy, cx+rad*math.sin(sweep), cy-rad*math.cos(sweep)), fill=(61, 152, 177), width=1)
-    home = settings.get('home')
-    all_nodes = [x for x in nodes if isinstance(x, dict)] + [dict(x, proto='meshcore', kind='relay') for x in hops if isinstance(x, dict)]
-    all_nodes.sort(key=lambda x: x.get('last_rssi') if isinstance(x.get('last_rssi'), (float, int)) else -999, reverse=True)
-    positions = []
-    for node in all_nodes:
-        x, y, a = position(node, home)
-        positions.append((node, x, y))
-        age = (sweep - a) % math.tau
-        glow = max(0, 1 - age / 1.5)
+        d.ellipse((CX-r, CY-r, CX+r, CY+r), outline=(26, 52, 58))
+    d.line((CX-RADIUS+1, CY, CX+RADIUS-1, CY), fill=(25, 47, 54))
+    d.line((CX, CY-RADIUS+1, CX, CY+RADIUS-1), fill=(25, 47, 54))
+    d.text((81, 10), 'N', font=SMALL, fill=(110, 152, 159))
+    # Radius formula in position() maps these rings to approximately these values.
+    for y, label in zip((103, 122, 141), ('-55', '-78', '-101') if not home else ('1.4', '9', '38')):
+        d.text((89, y), label, font=SMALL, fill=(62, 101, 105))
+    d.text((12, 151), 'dBm' if not home else 'km', font=SMALL, fill=(76, 121, 125))
+    glow(im, CX, CY, (48, 162, 190), 4)
+    d = ImageDraw.Draw(im)
+    d.ellipse((CX-1, CY-1, CX+1, CY+1), fill=(135, 226, 233))
+    for node, x, y, _ in reversed(positions):
         c = color(node.get('proto'))
-        factor = .38 + .62*glow
-        c = tuple(int(v*factor) for v in c)
         snr = node.get('last_snr')
-        radius = 2 if not isinstance(snr, (int, float)) or snr < 4 else 3
+        size = 2 if not isinstance(snr, (int, float)) or snr < 2 else 3
+        glow(im, x, y, c, size)
+        d = ImageDraw.Draw(im)
+        dim = tuple(int(v*.68) for v in c)
         if node.get('kind') in ('repeater', 'relay'):
-            d.polygon([(x, y-radius-1), (x+radius+1,y), (x,y+radius+1), (x-radius-1,y)], fill=c)
+            d.polygon([(x,y-size), (x+size,y), (x,y+size), (x-size,y)], fill=dim)
         else:
-            d.ellipse((x-radius,y-radius,x+radius,y+radius), fill=c)
-    for t, ids in events:
-        age = now-t
-        if not 0 <= age < 1.4:
+            d.ellipse((x-size,y-size,x+size,y+size), outline=dim, width=1)
+    # A few strong named stations, avoiding labels colliding with one another or the rim.
+    occupied = []
+    d = ImageDraw.Draw(im)
+    for node, x, y, _ in positions:
+        name = node.get('short_name') or node.get('name')
+        if not name:
             continue
-        matches = [(x,y) for node,x,y in positions if any(s and (str(node.get('node_id') or node.get('id') or '').lower().startswith(s) or s.startswith(str(node.get('node_id') or node.get('id') or 'not-an-id').lower()) or str(node.get('name') or '').lower() == s) for s in ids)]
-        x,y = matches[0] if matches else (cx,cy)
-        r = 2 + age*13
-        v = int(180*(1-age/1.4))
-        d.ellipse((x-r,y-r,x+r,y+r), outline=(v//2,v,v))
-    d.ellipse((80,83,84,87), fill=(150,220,228))
-    d.text((7, 1), 'N', font=MONO, fill=(69, 111, 123))
-    d.line((165, 10, 165, 160), fill=(30, 38, 48))
-    mode = str(status.get('mode') or 'offline').upper()
-    accent = BLUE if online else (255,184,107)
-    d.rounded_rectangle((174, 8, 218, 23), radius=4, fill=(17, 35, 49) if online else (45,30,20))
-    d.text((179, 10), clip(mode, 37, MONO), font=MONO, fill=accent)
-    d.text((226, 10), 'LIVE' if online else 'OFFLINE', font=MONO, fill=accent)
-    preset = str(status.get('config') or 'waiting for meshscan...').replace('meshcore_', '').upper()
-    d.text((174, 30), clip(preset, 140, BOLD), font=BOLD, fill=TEXT if online else MUTED)
-    freq = status.get('freq')
-    desc = ('%s MHz  /  SF%s' % (freq, status.get('sf', '?'))) if freq is not None else 'reconnecting to API'
-    d.text((174, 44), clip(desc, 140, MONO), font=MONO, fill=MUTED)
-    d.text((174, 62), str(summary.get('n', '--')), font=BIG, fill=TEXT)
-    d.text((257, 62), str(summary.get('nodes', '--')), font=BIG, fill=BLUE)
-    d.text((174, 84), 'PACKETS', font=MONO, fill=MUTED)
-    d.text((257, 84), 'NODES', font=MONO, fill=MUTED)
-    d.line((174, 99, 312, 99), fill=(30, 38, 48))
-    if selected and positions:
-        node = positions[(selected-1) % len(positions)][0]
-        ticker = str(node.get('name') or node.get('node_id') or node.get('id'))
-    elif ticker == 'Listening for packets' and messages:
-        ticker = messages[0].get('text') or ticker
-    d.text((174, 104), clip(ticker, 138, FONT), font=FONT, fill=TEXT)
-    hist = status.get('noise_hist') or []
-    vals = [row[1] for row in hist[-40:] if isinstance(row, list) and len(row)>1 and isinstance(row[1], (float,int))]
-    d.text((174, 121), 'NOISE', font=MONO, fill=MUTED)
-    noise = status.get('noise')
-    d.text((174, 133), ('%.0f dBm' % noise) if isinstance(noise, (int,float)) else '-- dBm', font=MONO, fill=TEXT)
-    if len(vals) > 1:
-        lo, hi = min(vals)-1, max(vals)+1
-        points = [(226+i*47/(len(vals)-1), 145-(v-lo)/(hi-lo)*20) for i,v in enumerate(vals)]
-        d.line(points, fill=(61, 143, 158), width=1)
-    qr = qr_image(url, 42)
-    im.paste(qr, (275, 115))
-    d.text((174, 157), 'SHIFT+Q QR  SPACE NODE', font=MONO, fill=(110,125,139))
+        label = clip(str(name), 42, SMALL)
+        width = int(SMALL.getlength(label))+4
+        options = [(x+5, y-10), (x-width-5, y+3), (x+5, y+3), (x-width-5, y-10)]
+        for lx, ly in options:
+            box = (int(lx), int(ly), int(lx+width), int(ly+9))
+            if box[0] < 11 or box[2] > 159 or box[1] < 14 or box[3] > 155:
+                continue
+            if any(not (box[2] < b[0] or box[0] > b[2] or box[3] < b[1] or box[1] > b[3]) for b in occupied):
+                continue
+            d.rounded_rectangle(box, 2, fill=(8, 22, 29))
+            d.text((box[0]+2, box[1]-1), label, font=SMALL, fill=(160, 190, 199))
+            occupied.append(box)
+            break
+        if len(occupied) == 3:
+            break
     return im
 
 
+def build_panel(data, positions, selected):
+    im = Image.new('RGB', (150, H), (6, 8, 12))
+    d = ImageDraw.Draw(im)
+    with data.lock:
+        status, summary = data.status, data.summary
+        online = data.online
+        kind = getattr(data, 'ticker_kind', 'LISTEN')
+        sender = getattr(data, 'ticker_sender', 'Waiting for traffic')
+        proto = getattr(data, 'ticker_proto', None)
+    mode = str(status.get('mode') or '').upper()
+    accent = GREEN if mode == 'CHAT' else BLUE
+    d.line((0, 10, 0, 159), fill=(32, 44, 52))
+    d.rounded_rectangle((7, 7, 53, 23), radius=4, fill=(14, 38, 37) if mode == 'CHAT' else (14, 29, 44))
+    d.text((13, 9), mode if mode in ('CHAT', 'SCAN') else '----', font=MONO, fill=accent)
+    d.ellipse((76, 12, 80, 16), fill=GREEN if online else (255, 184, 107))
+    d.text((85, 9), 'LIVE' if online else 'OFFLINE', font=MONO, fill=GREEN if online else (255, 184, 107))
+    title = preset_name(status.get('config'))
+    d.text((7, 28), clip(title, 137, BOLD), font=BOLD, fill=TEXT if online else MUTED)
+    freq = status.get('freq')
+    desc = '%s MHz  /  SF%s' % (freq, status.get('sf', '?')) if freq is not None else 'Reconnecting to API'
+    d.text((7, 43), clip(desc, 137, MONO), font=MONO, fill=MUTED)
+    d.text((7, 56), str(summary.get('n', '--')), font=BIG, fill=TEXT)
+    d.text((89, 56), str(summary.get('nodes', '--')), font=BIG, fill=BLUE)
+    d.text((8, 83), 'PACKETS', font=SMALL, fill=MUTED)
+    d.text((90, 83), 'NODES', font=SMALL, fill=MUTED)
+    d.line((7, 96, 143, 96), fill=(31, 44, 52))
+    if selected and positions:
+        node = positions[(selected-1) % len(positions)][0]
+        kind, sender = 'NODE', str(node.get('name') or node.get('node_id') or node.get('id') or 'Unknown')
+        proto = node.get('proto')
+    chip = clip(kind.upper(), 54, SMALL)
+    chip_width = min(59, max(29, int(SMALL.getlength(chip))+8))
+    c = color(proto) if proto else BLUE
+    d.rounded_rectangle((7, 102, 7+chip_width, 115), radius=3, fill=tuple(int(v*.13) for v in c))
+    d.text((11, 103), chip, font=SMALL, fill=c)
+    d.text((13+chip_width, 103), clip(sender, 130-chip_width, FONT), font=FONT, fill=TEXT)
+    d.text((7, 122), 'NOISE FLOOR', font=SMALL, fill=MUTED)
+    noise = status.get('noise')
+    value = ('%.0f dBm' % noise) if isinstance(noise, (int, float)) else '-- dBm'
+    d.text((103, 122), value, font=SMALL, fill=TEXT)
+    hist = status.get('noise_hist') or []
+    vals = [row[1] for row in hist[-48:] if isinstance(row, list) and len(row)>1 and isinstance(row[1], (int,float))]
+    if len(vals) > 1:
+        lo, hi = min(vals)-1, max(vals)+1
+        points = [(8+i*134/(len(vals)-1), 148-(v-lo)/(hi-lo)*13) for i,v in enumerate(vals)]
+        d.line(points, fill=(55, 153, 168), width=1)
+    else:
+        d.line((8, 145, 142, 145), fill=(31, 55, 61))
+    d.text((7, 155), 'SHIFT+Q  DASHBOARD', font=SMALL, fill=(108, 145, 151))
+    return im
+
+
+class Renderer:
+    def __init__(self):
+        self.home = home_override()
+        self.scope_key = None
+        self.panel_at = 0
+        self.positions = []
+        self.scope = None
+        self.panel = None
+        self.trail = np.zeros((80, 80), dtype=np.float32)
+        self.beams = []
+        for i in range(180):
+            angle = i * math.tau / 180
+            mask = Image.new('L', (80, 80))
+            d = ImageDraw.Draw(mask)
+            d.line((40, 40, 40+37*math.sin(angle), 40-37*math.cos(angle)), fill=200, width=1)
+            self.beams.append(np.asarray(mask, dtype=np.float32))
+
+    def render(self, data, now, qr_view, selected, url):
+        if qr_view:
+            im = Image.new('RGB', (W, H), (6, 8, 12))
+            d = ImageDraw.Draw(im)
+            qr = qr_image(url, 150)
+            im.paste(qr, (9, (H-qr.height)//2))
+            d.text((174, 23), 'DASHBOARD', font=BOLD, fill=BLUE)
+            d.text((174, 47), 'Scan to explore', font=FONT, fill=TEXT)
+            d.text((174, 62), 'your live mesh.', font=FONT, fill=MUTED)
+            d.text((174, 91), url, font=SMALL, fill=TEXT)
+            d.line((174, 114, 311, 114), fill=(33, 54, 65))
+            d.text((174, 126), 'SHIFT+Q  BACK', font=MONO, fill=MUTED)
+            return im
+        with data.lock:
+            nodes, hops, settings = data.nodes, data.hops, data.settings
+            events = list(data.events)
+        home = self.home or settings.get('home')
+        key = (id(nodes), id(hops), str(home))
+        if key != self.scope_key:
+            self.positions = plot_nodes(nodes, hops, home)
+            self.scope = build_scope(self.positions, home)
+            self.scope_key = key
+            self.panel_at = 0
+        if now >= self.panel_at:
+            self.panel = build_panel(data, self.positions, selected)
+            self.panel_at = now + 0.8
+        im = self.scope.copy()
+        im.paste(self.panel, (170, 0))
+        sweep = (now * .8) % math.tau
+        self.trail *= .90
+        np.add(self.trail, self.beams[int(sweep / math.tau * 180) % 180], out=self.trail)
+        np.minimum(self.trail, 200, out=self.trail)
+        # The decaying half-resolution intensity field supplies a soft phosphor trail.
+        alpha = Image.fromarray(self.trail.astype(np.uint8), 'L').resize((156, 156), Image.Resampling.BILINEAR)
+        im.paste((37, 142, 157), (7, 7, 163, 163), alpha)
+        d = ImageDraw.Draw(im)
+        d.line((CX, CY, CX+75*math.sin(sweep), CY-75*math.cos(sweep)), fill=(87, 191, 208))
+        for node, x, y, angle in self.positions:
+            age = (sweep - angle) % math.tau
+            if age < .16:
+                glow(im, x, y, color(node.get('proto')), 3)
+                d = ImageDraw.Draw(im)
+                d.ellipse((x-1,y-1,x+1,y+1), fill=TEXT)
+        for t, ids in events:
+            age = now-t
+            if not 0 <= age < 1.4:
+                continue
+            match = next(((x,y) for n,x,y,_ in self.positions if any(s and (str(n.get('node_id') or n.get('id') or '').lower().startswith(s) or s.startswith(str(n.get('node_id') or n.get('id') or 'not-an-id').lower()) or str(n.get('name') or '').lower() == s) for s in ids)), (CX,CY))
+            x, y = match
+            r, v = 2+age*13, int(190*(1-age/1.4))
+            d.ellipse((x-r,y-r,x+r,y+r), outline=(v//2,v,v))
+        return im
+
+
+def render(data, now, qr_view, selected, url):
+    """Compatibility entry point for headless rendering tests."""
+    return Renderer().render(data, now, qr_view, selected, url)
+
+
 def main():
-    data, url = Data(), dashboard_url()
+    data, url, renderer = Data(), dashboard_url(), Renderer()
     fb = os.open(os.environ.get('APPLAUNCH_LINUX_FBDEV_DEVICE', '/dev/fb0'), os.O_RDWR)
     mapping = mmap.mmap(fb, W*H*2, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE)
     keyboard = os.environ.get('APPLAUNCH_LINUX_KEYBOARD_DEVICE', '/dev/input/by-path/platform-3f804000.i2c-event')
@@ -297,12 +466,13 @@ def main():
                         qr_view = not qr_view
                     elif code in (15, 57):
                         selected += 1
-            frame = render(data, start, qr_view, selected, url)
+                        renderer.panel_at = 0
+            frame = renderer.render(data, start, qr_view, selected, url)
             rgb = np.asarray(frame, dtype=np.uint16)
             pixels = ((rgb[:,:,0] >> 3) << 11) | ((rgb[:,:,1] >> 2) << 5) | (rgb[:,:,2] >> 3)
             mapping[:] = pixels.astype('<u2').tobytes()
             frames += 1
-            delay = 1/30 - (time.monotonic()-start)
+            delay = 1/24 - (time.monotonic()-start)
             if delay > 0:
                 time.sleep(delay)
     finally:
