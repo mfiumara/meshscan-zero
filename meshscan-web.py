@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """meshscan-web: live dashboard + JSON API for meshscan (port 8080).
 
-Viewing is open to the local network. Anything that makes the radio transmit or changes the
-node (send, mode switch, settings) needs the PIN chosen in the first-run setup.
+Viewing is open to the local network. Sending or switching modes needs a PIN session or the
+owner-only local token over loopback; changing settings always needs the PIN session.
 
 GET  /                      dashboard (web/index.html)
 GET  /api/<x>               summary, nodes, hops, stats, packets, messages, status, settings, session
 GET  /api/stream            Server-Sent Events: packet, message, status
 POST /api/setup             first-run setup (only while unconfigured)
 POST /api/login | logout    PIN session (HttpOnly cookie)
-POST /api/send | mode | settings   (need a session)
+POST /api/send | mode       PIN session or local token; /api/settings needs a session
 """
-import json, os, re, secrets, sqlite3, sys, threading, time
+import json, os, re, secrets, sqlite3, stat, sys, threading, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
@@ -30,6 +30,41 @@ COOKIE = "meshscan_session"
 SESSIONS = {}          # token -> expiry
 FAILS = {}             # client ip -> [timestamps of failed PIN attempts]
 LOCK = threading.Lock()
+LOCAL_TOKEN = None       # Never exposed through the HTTP API.
+LOCAL_HEADER = "X-Meshscan-Local-Token"
+
+
+def init_local_token():
+    """Create once with owner-only permissions; reject links and unsafe existing files."""
+    os.makedirs(common.CTL, exist_ok=True)
+    path = os.path.join(common.CTL, "local.token")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        fd = os.open(path, flags, 0o600)
+    except FileExistsError:
+        fd = None
+    if fd is not None:
+        with os.fdopen(fd, "w") as f:
+            f.write(secrets.token_urlsafe(32))
+    fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    with os.fdopen(fd) as f:
+        info = os.fstat(f.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077:
+            raise PermissionError("local token must be an owner-only regular file")
+        token = f.read(256).strip()
+    if not re.fullmatch(r"[A-Za-z0-9_-]{40,128}", token):
+        raise ValueError("invalid local token file")
+    return token
+
+
+def valid_local_request(ip, headers, path):
+    if path not in ("/api/send", "/api/mode") or ip not in ("127.0.0.1", "::1"):
+        return False
+    # Browsers must use the PIN/session path, even when browsing on the device.
+    if headers.get("Origin") or headers.get("X-Forwarded-For") or headers.get("Forwarded"):
+        return False
+    candidate = headers.get(LOCAL_HEADER, "")
+    return bool(LOCAL_TOKEN and candidate and secrets.compare_digest(candidate.encode(), LOCAL_TOKEN.encode()))
 
 
 def q(sql, args=()):
@@ -294,7 +329,7 @@ class H(BaseHTTPRequestHandler):
         # everything below transmits or changes the node
         if not settings:
             return self.json(409, {"error": "finish setup first"})
-        if not valid_session(self.token()):
+        if not valid_session(self.token()) and not valid_local_request(ip, self.headers, path):
             return self.json(401, {"error": "locked"})
         if path == "/api/mode":
             mode = body.get("mode")
@@ -349,4 +384,5 @@ class Server(ThreadingHTTPServer):
 
 
 if __name__ == "__main__":
+    LOCAL_TOKEN = init_local_token()
     Server(("0.0.0.0", PORT), H).serve_forever()

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Meshscan's read-only Cardputer framebuffer map."""
+"""Meshscan's Cardputer framebuffer map and chat."""
 import functools
 import http.client
 import json
@@ -15,6 +15,7 @@ import threading
 import time
 import urllib.request
 
+import chat
 import map_tiles
 import numpy as np
 import qrcode
@@ -126,6 +127,10 @@ class Data:
             if event == 'status':
                 self.status = value
             elif event == 'message':
+                if value.get('id') is not None:
+                    self.messages = [m for m in self.messages if m.get('id') != value['id']]
+                    self.messages.insert(0, value)
+                    self.messages = self.messages[:200]
                 self.ticker = str(value.get('text') or 'New message').replace('\n', ' ')
                 self.ticker_kind = 'MESSAGE'
                 self.ticker_sender = str(value.get('src') or 'New message')
@@ -360,7 +365,7 @@ def build_map_panel(data, nodes, selected, now, home, on_map):
     if selected:
         d.text((7,160), clip(str(kind).upper() + ' · ' + str(sender), 116, SMALL), font=SMALL, fill=BLUE)
     else:
-        d.text((7,160), 'Q EXIT  SHIFT+Q QR', font=SMALL, fill=(108,145,151))
+        d.text((7,160), 'C CHAT  SHIFT+Q QR', font=SMALL, fill=(108,145,151))
     return im
 
 
@@ -507,12 +512,13 @@ def render(data, now, qr_view, selected, url):
 
 def main():
     data, url, renderer = Data(), dashboard_url(), Renderer()
+    chat_view = chat.Chat(data, sys.modules[__name__])
     fb = os.open(os.environ.get('APPLAUNCH_LINUX_FBDEV_DEVICE','/dev/fb0'),os.O_RDWR)
     mapping = mmap.mmap(fb,W*H*2,mmap.MAP_SHARED,mmap.PROT_READ|mmap.PROT_WRITE)
     keyboard = os.environ.get('APPLAUNCH_LINUX_KEYBOARD_DEVICE','/dev/input/by-path/platform-3f804000.i2c-event')
     keyfd = os.open(keyboard,os.O_RDONLY|os.O_NONBLOCK)
     event = struct.Struct('@llHHi')
-    qr_view, running, shifted = False, True, False
+    qr_view, running, shifted, in_chat = False, True, False, False
     frames, started = 0, time.monotonic()
     try:
         while running:
@@ -526,14 +532,19 @@ def main():
                     continue
                 if code in (42,54):
                     shifted = bool(value)
+                elif in_chat:
+                    if chat_view.handle(code, value, shifted):
+                        in_chat = False
                 elif value == 1:
                     if code == 1 or (code == 16 and not shifted):
                         running = False
                     elif code == 16 and shifted:
                         qr_view = not qr_view
+                    elif not qr_view and code in (46, 28, 96):
+                        in_chat = True
                     else:
                         renderer.change_view(code)
-            frame = renderer.render(data,start,qr_view,0,url)
+            frame = chat_view.draw(url) if in_chat else renderer.render(data,start,qr_view,0,url)
             rgb = np.asarray(frame,dtype=np.uint16)
             pixels = ((rgb[:,:,0]>>3)<<11)|((rgb[:,:,1]>>2)<<5)|(rgb[:,:,2]>>3)
             mapping[:] = pixels.astype('<u2').tobytes()
@@ -541,7 +552,7 @@ def main():
             with data.lock:
                 has_pulses = any(start-t < 1.4 for t, _ in data.events)
             has_recent = any(age_seconds(n, time.time()) < 3600 for n, _, _ in renderer.positions)
-            fps = 12 if not qr_view and (has_recent or has_pulses) else 4
+            fps = 12 if not in_chat and not qr_view and (has_recent or has_pulses) else 4
             delay = 1/fps-(time.monotonic()-start)
             if delay>0:
                 time.sleep(delay)

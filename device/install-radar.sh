@@ -5,7 +5,7 @@ set -eu
 HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 install -d /opt/meshscan-radar /opt/meshscan-radar/fonts /usr/share/APPLaunch/applications /usr/share/APPLaunch/share/images
 install -m 755 "$HERE/radar.py" /opt/meshscan-radar/radar.py
-install -m 644 "$HERE/map_tiles.py" /opt/meshscan-radar/map_tiles.py
+install -m 644 "$HERE/map_tiles.py" "$HERE/chat.py" /opt/meshscan-radar/
 install -m 644 "$HERE"/fonts/* /opt/meshscan-radar/fonts/
 if [ ! -x /opt/meshscan-radar/venv/bin/python ]; then
     python3 -m venv --system-site-packages /opt/meshscan-radar/venv

@@ -34,7 +34,7 @@ Then open `http://cardputerzero.local:8080`. The first visit walks you through a
 
 1. **Node name**, shown next to every message you send.
 2. **Region:** Netherlands (MeshCore NL), EU/UK (Narrow) or USA/Canada, plus the region tag your floods carry. Dutch repeaters drop untagged floods, so pick your province (`#nl-nh`, `#nl-ut`, …) or the whole country.
-3. **PIN:** anyone on your network can watch the dashboard; sending, switching modes and changing settings need the PIN.
+3. **PIN:** anyone on your network can watch the dashboard; browser sending, switching modes and changing settings need the PIN. The physical Cardputer app uses the local-only control token described below.
 4. **Start in Chat or Scan**, and optionally a home location for the on-device map.
 
 Until setup is done the radio stays in Scan mode and never transmits. Everything is changeable later under ⚙ Settings (saving restarts the radio, about 10 s), including extra `#hashtag` channels (key derived from the name) and private channels (base64 key).
@@ -61,9 +61,18 @@ Your node doesn't send adverts, so it won't show up in other people's contact li
 
 ## On-device map
 
-**Mesh Map** shows only nodes with advertised coordinates on a dark OpenFreeMap basemap. It fits located nodes heard in the last 24 hours; recent nodes glow, older nodes are dimmer, and nodes without GPS are counted rather than placed. RSSI is not shown as node signal: it can belong to the relay that forwarded an advert. The app reads only the local HTTP API and reconnects after outages.
+**Mesh Map** shows only nodes with advertised coordinates on a dark OpenFreeMap basemap. It fits located nodes heard in the last 24 hours; recent nodes glow, older nodes are dimmer, and nodes without GPS are counted rather than placed. RSSI is not shown as node signal: it can belong to the relay that forwarded an advert. The app reconnects after API outages.
 
 `install.sh` installs it too (or run `sudo ./device/install-radar.sh` on its own). Open **Mesh Map** from APPLaunch. Arrows pan; **Sym + / = / -** zoom; **F** fits the last 24 hours; **H** centers on home if configured; **A** toggles older nodes; **Space/Tab** selects and centers a node. **Shift+Q** opens the dashboard QR, and **Esc/q** exits.
+
+Press **C** or **Enter** on the map to open chat. **Tab** or left/right arrows switch channels, up/down scroll, **Enter** sends the composer, and **Esc** returns to the map. Shift and the Cardputer Sym layer work while typing. Chat requires setup and chat mode; in scan mode, Enter offers the switch. Sending transmits over the radio.
+
+The web service creates `/var/lib/meshscan/ctl/local.token` with mode `0600`, owned by the service/desktop user. The device app presents it in a header only for send and mode requests from `127.0.0.1`; the server also allows `::1`, rejects token use with `Origin` or forwarded-address headers, and never serves the token. It does not grant settings access. Browser and remote send/mode/settings requests still need the PIN session; first-run setup remains the existing exception. JSON-only POSTs and SameSite cookies remain in force. **Any process running as the desktop user can read this token and send**, so physical/local-user access is trusted.
+
+![Chat on the private test channel](docs/chat-messages.png)
+![Chat setup prompt](docs/chat-setup.png)
+
+More device captures: [launcher](docs/chat-launcher.png), [map](docs/chat-map.png), [scan-mode prompt](docs/chat-scan.png), [Public tab](docs/chat-public.png), [private tab](docs/chat-private.png), and [composer](docs/chat-composer.png).
 
 Tiles are fetched asynchronously from [OpenFreeMap](https://openfreemap.org/) (© OpenStreetMap contributors, © OpenMapTiles) and cached under `~/.cache/meshscan-map` for offline use. Uncached areas show a warning when offline. For diagnostics, `MESH_MAP_OFFLINE=1` disables tile fetching and `RADAR_HOME=52.37,4.89` overrides the home marker for that process only. Neither changes meshscan settings. The app uses its own venv under `/opt/meshscan-radar`; the bundled Inter and JetBrains Mono fonts have SIL Open Font licences in `device/fonts/`.
 
