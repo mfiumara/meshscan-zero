@@ -59,6 +59,19 @@ The chat window has channel tabs, live messages and a composer. Your own message
 
 Your node doesn't send adverts, so it won't show up in other people's contact lists, but your name is in every message. While in chat mode the radio stays on one preset, so the other scan slots aren't visited.
 
+## On-device radar
+
+The optional **Mesh Radar** APPLaunch app shows a sweeping scope, live packet/node counts, signal and noise, and a QR link to the dashboard. Diamonds are repeaters/relays; dots are other nodes. With a configured home location, located nodes use bearing and log-scaled distance; otherwise the angle is stable but arbitrary and radius approximates signal strength. It reads only the local HTTP API and keeps retrying if the web service is unavailable.
+
+```sh
+sudo ./device/install-radar.sh
+```
+
+Launch **Mesh Radar** from APPLaunch. **Shift+Q** toggles the full-screen dashboard QR; **Space** or **Tab** cycles nodes by signal strength; **Esc** or lowercase **q** exits. The dashboard URL is also visible in the QR view. The installer uses a separate venv under `/opt/meshscan-radar` and does not restart meshscan services.
+
+![On-device radar](docs/radar.png)
+![Dashboard QR](docs/radar-qr.png)
+
 ## Hardware notes
 
 The cap needs power before the SX1262 responds. meshscan switches on `/sys/class/leds/ext_5v_out` and drives PI4IOE5V6408 P0 high (I²C1, 0x43). Pinout follows Meshtastic's `lora-cardputer-zero.yaml`: spidev0.1, BUSY GPIO22, RESET GPIO26, DIO2 as RF switch, TCXO 3.0 V on DIO3.

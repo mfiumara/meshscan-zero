@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Mesh Radar
+Comment=Live meshscan radar
+Exec=/opt/meshscan-radar/venv/bin/python /opt/meshscan-radar/radar.py
+Icon=share/images/meshscan-radar.png
+Terminal=false
