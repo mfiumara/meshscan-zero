@@ -12,64 +12,52 @@ So meshscan hops between presets, saves everything it hears to SQLite, and shows
 
 ## What it does
 
-- Two modes, switched from the dashboard:
+- **Two modes**, switched from the dashboard header:
   - **Scan:** drives the SX1262 directly over SPI and hops between presets. **Never transmits.**
-  - **Chat:** runs a real MeshCore node (openhop-core) on the MeshCore NL settings, so you can read and send on the Public channel from the browser.
-- Cycles through presets (defaults below; override with `/etc/meshscan.json`).
-- Stores every packet with RSSI, SNR, raw bytes, and CRC status, plus per-preset counters for preambles and headers, so you can see activity even when nothing decodes.
-- **MeshCore:** decodes adverts (name, type, location, public key), logs the relay path, and decrypts the Public group channel (verified on air: 166 Public messages overnight in Amsterdam).
-- **Meshtastic:** decrypts the default channel (`AQ==`) and extracts node info, position, telemetry, and text.
-- Keeps a node table (first seen, last seen, packet count, last RSSI/SNR), like a normal mesh node does.
-- Serves a live dashboard on port 8080: packets stream in over Server-Sent Events, nodes on a MapLibre vector map (OpenFreeMap, no API key), what the radio is listening to right now, noise floor, relays, presets, and messages. Works on phones too.
-
-| Slot | Freq | SF | BW | Dwell |
-|---|---|---|---|---|
-| MeshCore NL | 869.618 MHz | 7 | 62.5 kHz | 10 min |
-| Meshtastic LongFast | 869.525 MHz | 11 | 250 kHz | 10 min |
-| Meshtastic MediumFast | 869.525 MHz | 9 | 250 kHz | 5 min |
-| MeshCore EU/UK Narrow | 869.618 MHz | 8 | 62.5 kHz | 3 min |
-| LoRaWAN 868.1 | 868.1 MHz | 7 | 125 kHz | 2 min |
-
-## Chat mode
-
-Chat mode turns the Cardputer into a MeshCore companion node and adds a chat window to the dashboard: channel tabs, live messages, and a composer. Your own messages show `sent`, then `heard repeated N×` once a repeater is heard re-broadcasting them. That is the only delivery signal a flood mesh gives you.
-
-It's opt-in, because it transmits. Edit `/etc/meshscan.json`:
-
-```json
-{
-  "default_mode": "chat",
-  "node": {
-    "name": "your-name",
-    "scope": "nl-nh",
-    "channels": [{"name": "#amsterdam"}]
-  }
-}
-```
-
-- `name` is shown next to every message you send.
-- `scope` is the MeshCore region your floods are tagged with. Dutch repeaters drop untagged floods since strict-region forwarding, so set this to your province code (`nl-nh`, `nl-ut`, …) or `nl`. See meshwiki.nl.
-- `channels` adds channels after Public. `#hashtag` channels derive their key from the name; private ones need `"psk"` (base64).
-- Radio defaults to the Dutch MeshCore settings (869.618 MHz, SF7, 62.5 kHz, CR5). Override with `"radio": {"frequency_hz": …, "spreading_factor": …}`.
-
-Chat mode uses [openhop-core](https://github.com/openhop-dev/openhop-core) (MIT) and the board bring-up from MeshTerm's `radionode.py` (Apache-2.0). Both ship with MeshTerm on the CardputerZero image (`/usr/lib/meshterm/site`).
-
-While in chat mode the radio stays on one preset, so the Meshtastic/LoRaWAN slots aren't scanned. Switch back to Scan in the header.
+  - **Chat:** runs a real MeshCore node ([openhop-core](https://github.com/openhop-dev/openhop-core)) so you can read and send on Public and your own channels from the browser.
+- Stores every packet with RSSI, SNR, raw bytes and CRC status, plus per-preset counters for preambles and headers, so you see activity even when nothing decodes.
+- **MeshCore:** decodes adverts (name, type, location, public key), logs the relay path, decrypts the Public channel.
+- **Meshtastic:** decrypts the default channel (`AQ==`): node info, position, telemetry, text.
+- Keeps a node table (first/last seen, packets, last RSSI/SNR), like a normal mesh node does.
+- Live dashboard on port 8080: packets stream in over Server-Sent Events, nodes on a MapLibre vector map (OpenFreeMap, no API key), chat window, what the radio is doing right now, noise floor, relays and presets. Works on phones.
 
 ## Install
 
-On the CardputerZero (Raspberry Pi OS trixie):
+On the CardputerZero (Raspberry Pi OS trixie, Cap LoRa-1262 attached):
 
 ```sh
 git clone https://github.com/mfiumara/meshscan-zero && cd meshscan-zero
 sudo ./install.sh
 ```
 
-Then open `http://cardputerzero.local:8080`. Summarize in the terminal with `meshscan-report` (optional argument: hours).
+Then open `http://cardputerzero.local:8080`. The first visit walks you through a short setup:
+
+1. **Node name**, shown next to every message you send.
+2. **Region:** Netherlands (MeshCore NL), EU/UK (Narrow) or USA/Canada, plus the region tag your floods carry. Dutch repeaters drop untagged floods, so pick your province (`#nl-nh`, `#nl-ut`, …) or the whole country.
+3. **PIN:** anyone on your network can watch the dashboard; sending, switching modes and changing settings need the PIN.
+4. **Start in Chat or Scan**, and optionally a home location for the on-device radar.
+
+Until setup is done the radio stays in Scan mode and never transmits. Everything is changeable later under ⚙ Settings (saving restarts the radio, about 10 s), including extra `#hashtag` channels (key derived from the name) and private channels (base64 key).
+
+Remove it with `sudo ./uninstall.sh` (keeps your data) or `sudo ./uninstall.sh --purge`. Summarize from the terminal with `meshscan-report [hours]`.
 
 The radio can only be used by one program at a time. To use MeshTerm, the Cap-LoRa-1262 app or `meshtasticd`, run `sudo systemctl stop meshscan` first.
 
-Anyone who can reach port 8080 can send messages as your node while chat mode is on. Keep it on a network you trust.
+## Region presets
+
+| Region | Chat (MeshCore) | Scan hops through |
+|---|---|---|
+| Netherlands | 869.618 MHz · SF7 · 62.5 kHz · CR5 | MeshCore NL, Meshtastic LongFast + MediumFast, MeshCore EU/UK Narrow, LoRaWAN 868.1 |
+| EU / UK | 869.618 MHz · SF8 · 62.5 kHz · CR8 (EU/UK Narrow) | MeshCore EU/UK Narrow, Meshtastic LongFast + MediumFast, MeshCore NL, LoRaWAN 868.1 |
+| USA / Canada | 910.525 MHz · SF7 · 62.5 kHz · CR5 | MeshCore US, Meshtastic US LongFast |
+
+Sources: meshwiki.nl (NL switch to SF7, May 2026), the MeshCore app preset list as documented by meshcore-info.eu and getuncabled (EU/UK Narrow), MeshCore Zero docs (US). Make sure your Cap matches your band: an 868 MHz radio doesn't become a 915 MHz radio by picking USA.
+
+## Chat mode
+
+The chat window has channel tabs, live messages and a composer. Your own messages show `sent`, then `heard repeated N×` once a repeater is heard re-broadcasting them. That's the only delivery signal a flood mesh gives you; on a busy mesh some messages collide and are never heard back.
+
+Your node doesn't send adverts, so it won't show up in other people's contact lists, but your name is in every message. While in chat mode the radio stays on one preset, so the other scan slots aren't visited.
 
 ## Hardware notes
 
@@ -77,13 +65,13 @@ The cap needs power before the SX1262 responds. meshscan switches on `/sys/class
 
 ## Status
 
-This is a weekend-afternoon tool, tested on one CardputerZero v5 in Amsterdam.
+Preview. Tested on one CardputerZero v5 in Amsterdam.
 
-- Verified on air: MeshCore adverts, relay paths, Meshtastic NodeInfo decryption, and chat-mode TX (a region-scoped group message, heard repeated by a nearby repeater).
-- Not verified on air yet: Meshtastic position and text, and the LoRaWAN slot.
-- Only the EU868 presets are set up. Other regions need a different config.
-- Uses polling instead of DIO1 interrupts. That's fine for logging, but it's not a real node.
+- Verified on air (Amsterdam, NL preset): MeshCore adverts, relay paths, Public channel decryption, Meshtastic NodeInfo decryption, and chat-mode TX (region-scoped group messages heard repeated by nearby repeaters).
+- Verified install: `install.sh` from a fresh clone on a purged device with MeshTerm hidden, then setup, scan, chat and send.
+- Not verified on air: the EU/UK Narrow and US presets (no such mesh in range here), Meshtastic position/text, the LoRaWAN slot.
+- Scan mode polls the SX1262 instead of using DIO1 interrupts. Fine for logging, but scan mode isn't a node; chat mode is.
 
 ## License
 
-GPL-3.0. See [LICENSE](LICENSE). meshscan uses the GPL-3.0 `meshtastic` Python package for its protobuf definitions.
+GPL-3.0. See [LICENSE](LICENSE). `meshscan_board.py` is adapted from MeshTerm (Apache-2.0); see [NOTICE](NOTICE). Chat mode uses openhop-core (MIT) and decoding uses the GPL-3.0 `meshtastic` Python package.
