@@ -8,7 +8,7 @@ from pathlib import Path
 import threading
 import urllib.request
 
-import mapbox_vector_tile
+import meshscan_pb
 from PIL import Image, ImageDraw, ImageFont
 
 TILE = 256
@@ -61,7 +61,7 @@ def draw_tile(raw):
     """Draw water, selected roads, borders and place names from OpenMapTiles layers."""
     if raw[:2] == b'\x1f\x8b':
         raw = gzip.decompress(raw)
-    layers = mapbox_vector_tile.decode(raw, default_options={'y_coord_down': True})
+    layers = meshscan_pb.decode_tile(raw)
     im = Image.new('RGB', (TILE, TILE), (12, 19, 24))
     d = ImageDraw.Draw(im)
     def transform(layer, coords):

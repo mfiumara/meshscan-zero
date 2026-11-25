@@ -28,10 +28,7 @@ try:
     from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 except ImportError:
     Cipher = None
-try:
-    from meshtastic.protobuf import mesh_pb2, portnums_pb2, telemetry_pb2
-except ImportError:
-    mesh_pb2 = None
+import meshscan_pb as pb
 
 
 # ---------------------------------------------------------------- radio
@@ -132,33 +129,32 @@ def decode_meshtastic(p):
     out = {"src": f"!{src:08x}", "dst": "^all" if dst == 0xFFFFFFFF else f"!{dst:08x}", "id": pid,
            "hop_limit": flags & 7, "hop_start": flags >> 5, "want_ack": bool(flags & 8),
            "via_mqtt": bool(flags & 16), "channel_hash": chash, "relay": relay}
-    if Cipher is None or mesh_pb2 is None:
+    if Cipher is None:
         return out
     try:
         nonce = struct.pack("<QI", pid, src) + b"\0\0\0\0"
-        data = mesh_pb2.Data(); data.ParseFromString(aes_ctr(MT_DEFAULT_KEY, nonce, p[16:]))
-        if data.portnum == 0:
+        data = pb.mt_data(aes_ctr(MT_DEFAULT_KEY, nonce, p[16:]))
+        port = data["portnum"]
+        if port == 0 or port not in pb.PORTNUM:
             raise ValueError
         out["decrypted"] = True
-        out["port"] = portnums_pb2.PortNum.Name(data.portnum)
-        pl = data.payload
-        if data.portnum == portnums_pb2.TEXT_MESSAGE_APP:
+        out["port"] = pb.PORTNUM[port]
+        pl = data["payload"]
+        if port == 1:    # TEXT_MESSAGE_APP
             out["text"] = pl.decode("utf-8", "replace")
-        elif data.portnum == portnums_pb2.NODEINFO_APP:
-            u = mesh_pb2.User(); u.ParseFromString(pl)
-            out["user"] = {"long_name": u.long_name, "short_name": u.short_name,
-                           "hw": mesh_pb2.HardwareModel.Name(u.hw_model) if u.hw_model else None,
-                           "role": u.role}
-        elif data.portnum == portnums_pb2.POSITION_APP:
-            pos = mesh_pb2.Position(); pos.ParseFromString(pl)
-            if pos.latitude_i or pos.longitude_i:
-                out["pos"] = {"lat": pos.latitude_i / 1e7, "lon": pos.longitude_i / 1e7, "alt": pos.altitude}
-        elif data.portnum == portnums_pb2.TELEMETRY_APP:
-            t = telemetry_pb2.Telemetry(); t.ParseFromString(pl)
-            if t.HasField("device_metrics"):
-                dm = t.device_metrics
-                out["telemetry"] = {"battery": dm.battery_level, "voltage": round(dm.voltage, 2),
-                                    "ch_util": round(dm.channel_utilization, 1), "air_util": round(dm.air_util_tx, 1)}
+        elif port == 4:  # NODEINFO_APP
+            u = pb.mt_user(pl)
+            out["user"] = {"long_name": u["long_name"], "short_name": u["short_name"],
+                           "hw": pb.HARDWARE.get(u["hw_model"]) if u["hw_model"] else None, "role": u["role"]}
+        elif port == 3:  # POSITION_APP
+            pos = pb.mt_position(pl)
+            if pos["latitude_i"] or pos["longitude_i"]:
+                out["pos"] = {"lat": pos["latitude_i"] / 1e7, "lon": pos["longitude_i"] / 1e7, "alt": pos["altitude"]}
+        elif port == 67:  # TELEMETRY_APP
+            dm = pb.mt_device_metrics(pl)
+            if dm:
+                out["telemetry"] = {"battery": dm["battery_level"], "voltage": round(dm["voltage"], 2),
+                                    "ch_util": round(dm["channel_utilization"], 1), "air_util": round(dm["air_util_tx"], 1)}
     except Exception:
         out["decrypted"] = False
     return out
