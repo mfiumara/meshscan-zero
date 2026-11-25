@@ -83,6 +83,19 @@ class LocalAuthTests(unittest.TestCase):
             urlopen(self.base+'/local.token')
         self.assertEqual(e.exception.code, 404)
 
+    def test_radio_control_auth_and_file(self):
+        h = {web.LOCAL_HEADER:web.LOCAL_TOKEN}
+        self.assertTrue(web.common.radio_on())
+        self.assertEqual(self.post('/api/radio', {'on':False}, h), 200)
+        self.assertFalse(web.common.radio_on())
+        self.assertEqual(self.post('/api/send', {'text':'x'}, h), 409)
+        self.assertEqual(self.post('/api/radio', {'on':'yes'}, h), 400)
+        self.assertEqual(self.post('/api/radio', {'on':True}, {**h, 'Origin':'http://evil.example'}), 401)
+        self.assertFalse(web.valid_local_request('192.168.1.1', h, '/api/radio'))
+        session = web.new_session()
+        self.assertEqual(self.post('/api/radio', {'on':True}, {'Cookie':web.COOKIE+'='+session}), 200)
+        self.assertTrue(web.common.radio_on())
+
     def test_browser_session_still_works(self):
         session = web.new_session()
         self.assertEqual(self.post('/api/mode', {'mode':'scan'}, {'Cookie':web.COOKIE+'='+session}), 200)

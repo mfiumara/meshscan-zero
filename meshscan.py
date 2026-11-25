@@ -321,7 +321,7 @@ def write_status_raw(d):
 
 
 def write_status(c, start, end, st, noise):
-    write_status_raw({"mode": "scan", "config": c["name"], "proto": c["proto"], "freq": c["freq"], "sf": c["sf"],
+    write_status_raw({"mode": "scan", "radio": "on", "config": c["name"], "proto": c["proto"], "freq": c["freq"], "sf": c["sf"],
                       "bw": c["bw"], "start": start, "end": end, "stats": st, "noise": noise[-1] if noise else None,
                       "noise_hist": NOISE_HIST[-120:]})
 
@@ -333,8 +333,53 @@ def load_config():
     return cfg
 
 
+RADIO_PINS = (22, 23, 26)  # BUSY, DIO1/IRQ, RESET on the Cap LoRa-1262
+
+
+def radio_free():
+    """None if we can claim the Cap's GPIO lines right now, else why not (another app holds them)."""
+    try:
+        req = gpiod.request_lines("/dev/gpiochip0", consumer="meshscan-probe",
+                                  config={p: gpiod.LineSettings() for p in RADIO_PINS})
+        req.release()
+        return None
+    except OSError as e:
+        return f"{e.strerror or e}"
+
+
+def wait_for_radio(mode_of):
+    """Block while the radio is paused or held by another app. Never touches the radio itself.
+
+    Returns False if we should exit instead (stop requested or settings changed)."""
+    delay, logged = 2, None
+    while RUNNING:
+        m = mode_of()
+        if m == "reload":
+            return False
+        if m == "paused":
+            if logged != "paused":
+                print("[radio] paused: hardware released for other apps", flush=True); logged = "paused"
+            write_status_raw({"mode": getattr(mode_of, "base", lambda: None)(), "radio": "paused"})
+            time.sleep(1); delay = 2
+            continue
+        why = radio_free()
+        if why is None:
+            if logged:
+                print("[radio] available again", flush=True)
+            return True
+        if logged != "busy":
+            print(f"[radio] in use by another app ({why}); retrying quietly", flush=True); logged = "busy"
+        write_status_raw({"mode": m, "radio": "busy", "radio_message": "Radio in use by another app"})
+        end = time.time() + delay
+        while RUNNING and time.time() < end and mode_of() not in ("paused", "reload"):
+            time.sleep(0.5)
+        delay = min(delay * 2, 30)
+    return False
+
+
 def mode_reader(cfg):
-    """'chat' | 'scan' from the dashboard's mode file, or 'reload' once the settings change."""
+    """'chat' | 'scan' from the dashboard's mode file, 'paused' while the radio switch is off,
+    or 'reload' once the settings change."""
     default = cfg.get("default_mode", "scan")
 
     def mtime():
@@ -344,16 +389,22 @@ def mode_reader(cfg):
             return None
     started_with = mtime()
 
-    def mode_of():
-        if mtime() != started_with:
-            return "reload"           # systemd restarts us with the new settings
+    def base():
         if not cfg.get("configured"):
-            return "scan"             # never transmit before the first-run setup
+            return "scan"
         try:
             m = (CTL / "mode").read_text().strip()
             return m if m in ("chat", "scan") else default
         except OSError:
             return default
+
+    def mode_of():
+        if mtime() != started_with:
+            return "reload"           # systemd restarts us with the new settings
+        if not common.radio_on():
+            return "paused"           # dashboard / Mesh Map paused the radio
+        return base()                 # never "chat" before the first-run setup
+    mode_of.base = base
     return mode_of
 
 
@@ -364,6 +415,8 @@ def main():
     os.makedirs(os.path.dirname(DB), exist_ok=True)
     CTL.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(DB); db.executescript(SCHEMA); migrate(db)
+    if not wait_for_radio(mode_of):
+        return  # stopping, or settings changed: systemd starts us again
     if mode_of() == "chat" and "--scan" not in sys.argv:
         import asyncio, logging, meshscan_chat
         logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")

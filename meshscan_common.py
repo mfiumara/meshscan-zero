@@ -57,6 +57,15 @@ REGIONS = {
 CONFIG_LABELS = {c["name"]: c for r in REGIONS.values() for c in r["scan"]}
 
 
+def radio_on():
+    """The absent control file defaults to on; only 'off' pauses the radio."""
+    try:
+        with open(os.path.join(CTL, 'radio')) as f:
+            return f.read().strip() != 'off'
+    except FileNotFoundError:
+        return True
+
+
 def load_settings():
     try:
         with open(SETTINGS) as f:

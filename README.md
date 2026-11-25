@@ -41,7 +41,7 @@ Until setup is done the radio stays in Scan mode and never transmits. Everything
 
 Remove it with `sudo ./uninstall.sh` (keeps your data) or `sudo ./uninstall.sh --purge`. Summarize from the terminal with `meshscan-report [hours]`.
 
-The radio can only be used by one program at a time. To use MeshTerm, the Cap-LoRa-1262 app or `meshtasticd`, run `sudo systemctl stop meshscan` first.
+The radio can only be used by one program at a time; see [Sharing the radio](#sharing-the-radio).
 
 ## Region presets
 
@@ -52,6 +52,15 @@ The radio can only be used by one program at a time. To use MeshTerm, the Cap-Lo
 | USA / Canada | 910.525 MHz · SF7 · 62.5 kHz · CR5 | MeshCore US, Meshtastic US LongFast |
 
 Sources: meshwiki.nl (NL switch to SF7, May 2026), the MeshCore app preset list as documented by meshcore-info.eu and getuncabled (EU/UK Narrow), MeshCore Zero docs (US). Make sure your Cap matches your band: an 868 MHz radio doesn't become a 915 MHz radio by picking USA.
+
+## Sharing the radio
+
+The Cap LoRa-1262 can only be used by one program at a time, and MeshTerm, MeshCore and the Cap-LoRa-1262 app use the same radio. meshscan never switches other services off. Instead:
+
+- **Pause radio:** the radio button in the dashboard header (needs the PIN) or **P** in Mesh Map. meshscan fully releases the radio's GPIO lines and SPI bus, while the dashboard, map and history keep running. Press it again to resume in the mode you were in.
+- **Radio in use by another app:** if another program already holds the radio when meshscan starts or resumes, the dashboard and Mesh Map say so and meshscan retries quietly (backing off to every 30 s) until it is free, without restart loops.
+
+The radio is on by default after installing: Scan mode only listens, and Chat mode only transmits when you send a message.
 
 ## Chat mode
 

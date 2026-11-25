@@ -211,6 +211,10 @@ tbody tr:hover{background:rgba(255,255,255,.025)}
 .iconbtn{all:unset;cursor:pointer;height:32px;padding:0 12px;border-radius:999px;display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);background:rgba(255,255,255,.03);border:1px solid var(--line)}
 .iconbtn:hover{color:var(--text);border-color:var(--line-2)}
 .iconbtn.ok{color:var(--mt);border-color:rgba(79,220,152,.3)}
+.iconbtn .rdot{width:7px;height:7px;border-radius:50%;background:currentColor}
+#radiobtn.on{color:var(--mt);border-color:rgba(79,220,152,.3)}
+#radiobtn.paused{color:var(--muted);border-style:dashed}
+#radiobtn.busy{color:#ffb86b;border-color:rgba(255,184,107,.4)}
 /* modals */
 .back{position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(3,5,8,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 .back.on{display:flex;animation:fade .18s ease}
@@ -288,10 +292,11 @@ footer a{color:var(--muted);text-decoration:none}footer a:hover{color:var(--text
 <div class="wrap">
 <header>
   <div class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#e8ecf2" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="1.6" fill="#e8ecf2"/><path d="M7.8 16.2a6 6 0 0 1 0-8.4M16.2 7.8a6 6 0 0 1 0 8.4"/><path d="M4.9 19.1a10 10 0 0 1 0-14.2M19.1 4.9a10 10 0 0 1 0 14.2" opacity=".5"/></svg></div>
-  <div class="brand"><h1>meshscan</h1><p>CardputerZero · Cap LoRa-1262 · receive-only</p></div>
+  <div class="brand"><h1>meshscan</h1><p id="brandsub">CardputerZero · Cap LoRa-1262</p></div>
   <div class="spacer"></div>
   <span class="pill clock num" id="clock">--:--:--</span>
   <div class="modeseg" id="modeseg"><button data-m="chat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v11H8l-4 4z"/></svg>Chat</button><button data-m="scan"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h3l3-8 4 16 3-8h7"/></svg>Scan</button></div>
+  <button class="iconbtn on" id="radiobtn" title="Pause the radio so other LoRa apps can use it"><span class="rdot"></span><span id="radiotxt">Radio on</span></button>
   <button class="iconbtn" id="lockbtn" title="Unlock to send and change settings"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path id="lockpath" d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span id="locktxt">Locked</span></button>
   <button class="iconbtn" id="gearbtn" title="Settings" style="padding:0 9px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
   <span class="pill live off" id="live"><span class="dot"></span><b>CONNECTING</b></span>
@@ -546,7 +551,17 @@ async function loadFeed(){const ps=await j('/api/packets');$('#feed').innerHTML=
 
 /* ---------------- radio status ---------------- */
 let ST=null;
+function renderRadio(){const r=RADIO();const b=$('#radiobtn');b.className='iconbtn '+r;
+  $('#radiotxt').textContent=r==='paused'?'Radio paused':r==='busy'?'In use by another app':'Radio on';
+  b.title=r==='paused'?'Resume the radio':r==='busy'?(ST.radio_message||'Another app is using the LoRa radio')+'. meshscan retries automatically.':'Pause the radio so other LoRa apps can use it'}
+const RADIO=()=>ST?.radio||'on';
+$('#radiobtn').addEventListener('click',()=>{if(!SETTINGS?.configured)return openSetup();
+  requireUnlock(async()=>{const off=RADIO()!=='paused';try{await post('/api/radio',{on:!off});toast(off?'Radio paused. Other apps can use it now.':'Resuming the radio…',true)}catch(err){toast('Radio switch failed: '+err.message)}})});
 function renderStatus(){
+  if(ST){renderRadio();$('#brandsub').textContent='CardputerZero · Cap LoRa-1262 · '+(RADIO()!=='on'?'radio '+RADIO():MODE==='chat'||ST.mode==='chat'?'chat node':'receive-only')}
+  if(ST&&RADIO()!=='on'){$('#r-what').textContent=RADIO()==='paused'?'Radio paused':'Radio busy';
+    $('#r-name').textContent=RADIO()==='paused'?'Released for other apps':'In use by another app';$('#r-rf').textContent=RADIO()==='paused'?'History and dashboard keep running':'Retrying automatically';
+    $('#r-bar').style.width='0%';$('#r-dot').style.background='#6b7480';MODE=ST.mode||MODE;renderMode();return}
   if(!ST||!ST.config)return;const c=HEX[ST.proto];MODE=ST.mode||'scan';renderMode();
   if(MODE==='chat'){
     $('#r-what').textContent='Chat node';$('#r-name').textContent=pretty(ST.config);$('#r-dot').style.background=c;
@@ -593,9 +608,9 @@ function renderChat(){
   $('#thread').innerHTML=html||`<div class="empty">No messages on #${esc(CH)} yet.</div>`;
   if(near||stickNext){body.scrollTop=body.scrollHeight;stickNext=false}
   renderComposer()}
-function renderComposer(){const idx=chanIdx(),cfg=SETTINGS?.configured,on=cfg&&MODE==='chat'&&idx!=null;const inp=$('#msgin');
+function renderComposer(){const idx=chanIdx(),cfg=SETTINGS?.configured,on=cfg&&MODE==='chat'&&idx!=null&&RADIO()==='on';const inp=$('#msgin');
   inp.disabled=!on;inp.readOnly=on&&!UNLOCKED;
-  inp.placeholder=!cfg?'Finish setup to send':MODE!=='chat'?'Switch to Chat mode to send':idx==null?`#${CH} is receive-only here`:!UNLOCKED?'Unlock to send':`Message #${CH} as ${ST?.node?.name||''}`;
+  inp.placeholder=!cfg?'Finish setup to send':RADIO()==='paused'?'Radio paused: resume it to send':RADIO()==='busy'?'Radio in use by another app':MODE!=='chat'?'Switch to Chat mode to send':idx==null?`#${CH} is receive-only here`:!UNLOCKED?'Unlock to send':`Message #${CH} as ${ST?.node?.name||''}`;
   const n=new TextEncoder().encode(inp.value).length;$('#msgcnt').textContent=n+'/140';$('#msgcnt').classList.toggle('over',n>140);
   $('#sendbtn').disabled=!on||!UNLOCKED||!inp.value.trim()||n>140;
   $('#whochip').textContent=MODE==='chat'&&ST?.node?`${ST.node.name} · ${ST.node.scope?'#'+ST.node.scope:'no region tag'}`:''}

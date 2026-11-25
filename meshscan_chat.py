@@ -142,7 +142,7 @@ async def run_chat(ms, cfg, db, ctl: Path, mode_of):
             if noise is not None:
                 ms.NOISE_HIST.append((round(time.time(), 1), noise, config_name)); del ms.NOISE_HIST[:-240]
             ms.write_status_raw({
-                "mode": "chat", "config": config_name, "proto": "meshcore", "freq": radio_cfg["frequency_hz"] / 1e6,
+                "mode": "chat", "radio": "on", "config": config_name, "proto": "meshcore", "freq": radio_cfg["frequency_hz"] / 1e6,
                 "sf": radio_cfg["spreading_factor"], "bw": radio_cfg["bandwidth_hz"] / 1e3, "start": started,
                 "end": None, "stats": {"packets": counters["rx"], "tx": counters["tx"], "pre": 0, "crc": 0},
                 "noise": noise, "noise_hist": ms.NOISE_HIST[-120:],

@@ -24,6 +24,7 @@ from PIL import Image, ImageDraw, ImageFont
 BASE = 'http://127.0.0.1:8080'
 W, H = 320, 170
 BLUE, GREEN, PURPLE = (94, 177, 255), (79, 220, 152), (185, 150, 255)
+AMBER = (255, 184, 107)
 TEXT, MUTED = (232, 236, 242), (139, 148, 163)
 FONTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fonts')
 FONT = ImageFont.truetype(os.path.join(FONTS, 'Inter.ttf'), 10)
@@ -194,6 +195,21 @@ PRESETS = {
 }
 
 
+def toggle_radio(data):
+    """Pause/resume the radio through the local API so other LoRa apps can use the Cap."""
+    with data.lock:
+        paused = (data.status or {}).get('radio') == 'paused'
+        data.radio_notice = ('Resuming radio…' if paused else 'Pausing radio…', time.time())
+
+    def worker():
+        try:
+            chat.post('/api/radio', {'on': paused})
+        except (OSError, RuntimeError, ValueError) as exc:
+            with data.lock:
+                data.radio_notice = ('Radio: ' + str(exc), time.time())
+    threading.Thread(target=worker, daemon=True, name='radio-toggle').start()
+
+
 def preset_name(value):
     value = str(value or '')
     if value in PRESETS:
@@ -325,13 +341,36 @@ def build_map_panel(data, nodes, selected, now, home, on_map):
     d.line((0, 6, 0, 165), fill=(35, 50, 57))
     d.rounded_rectangle((7, 5, 51, 20), 4, fill=(14,38,37) if mode == 'CHAT' else (14,29,44))
     d.text((11,6), mode if mode in ('CHAT','SCAN') else '----', font=MONO, fill=accent)
-    d.ellipse((65,10,69,14), fill=GREEN if online else (255,184,107))
-    d.text((73,6), 'LIVE' if online else 'OFFLINE', font=MONO, fill=GREEN if online else (255,184,107))
+    radio = status.get('radio') or 'on'
+    if not online:
+        pill, pc = 'OFFLINE', AMBER
+    elif radio == 'paused':
+        pill, pc = 'PAUSED', (128,140,146)
+    elif radio == 'busy':
+        pill, pc = 'BUSY', AMBER
+    else:
+        pill, pc = 'LIVE', GREEN
+    if radio == 'paused' and online:
+        d.rectangle((65,10,66,14), fill=pc); d.rectangle((68,10,69,14), fill=pc)
+    else:
+        d.ellipse((65,10,69,14), fill=pc)
+    d.text((73,6), pill, font=MONO, fill=pc)
     name = preset_name(status.get('config'))
+    if online and radio == 'paused':
+        name = 'Radio paused'
+    elif online and radio == 'busy':
+        name = 'Radio in use'
     pf = next((f for f in PRESET_FONTS if f.getlength(name) <= 118), PRESET_FONTS[-1])
     d.text((7, 23 + (11 - pf.size)//2), clip(name, 118, pf), font=pf, fill=TEXT)
     freq = status.get('freq')
     desc = '%s MHz / SF%s' % (freq, status.get('sf','?')) if freq is not None else 'Waiting for API'
+    if online and radio == 'paused':
+        desc = 'Free for others · P resumes'
+    elif online and radio == 'busy':
+        desc = 'Retrying automatically'
+    notice = getattr(data, 'radio_notice', None)
+    if notice and time.time() - notice[1] < 4:
+        desc = notice[0]
     d.text((7,37), clip(desc, 118, SMALL), font=SMALL, fill=MUTED)
     recent = sum(1 for n in nodes if isinstance(n, dict) and age_seconds(n, now)<3600)
     no_gps = sum(1 for n in nodes if isinstance(n, dict) and not map_tiles.valid_location(n))
@@ -365,7 +404,7 @@ def build_map_panel(data, nodes, selected, now, home, on_map):
     if selected:
         d.text((7,160), clip(str(kind).upper() + ' · ' + str(sender), 116, SMALL), font=SMALL, fill=BLUE)
     else:
-        d.text((7,160), 'C CHAT  SHIFT+Q QR', font=SMALL, fill=(108,145,151))
+        d.text((7,160), 'C CHAT  P RADIO  SHIFT+Q QR', font=SMALL, fill=(108,145,151))
     return im
 
 
@@ -542,6 +581,8 @@ def main():
                         qr_view = not qr_view
                     elif not qr_view and code in (46, 28, 96):
                         in_chat = True
+                    elif not qr_view and code == 25:  # P: pause/resume the radio for other apps
+                        toggle_radio(data)
                     else:
                         renderer.change_view(code)
             frame = chat_view.draw(url) if in_chat else renderer.render(data,start,qr_view,0,url)

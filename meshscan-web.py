@@ -58,7 +58,7 @@ def init_local_token():
 
 
 def valid_local_request(ip, headers, path):
-    if path not in ("/api/send", "/api/mode") or ip not in ("127.0.0.1", "::1"):
+    if path not in ("/api/send", "/api/mode", "/api/radio") or ip not in ("127.0.0.1", "::1"):
         return False
     # Browsers must use the PIN/session path, even when browsing on the device.
     if headers.get("Origin") or headers.get("X-Forwarded-For") or headers.get("Forwarded"):
@@ -331,6 +331,12 @@ class H(BaseHTTPRequestHandler):
             return self.json(409, {"error": "finish setup first"})
         if not valid_session(self.token()) and not valid_local_request(ip, self.headers, path):
             return self.json(401, {"error": "locked"})
+        if path == "/api/radio":
+            on = body.get("on")
+            if not isinstance(on, bool):
+                raise ValueError("on must be a boolean")
+            write_ctl("radio", "on" if on else "off")
+            return self.json(200, {"ok": True, "on": on})
         if path == "/api/mode":
             mode = body.get("mode")
             if mode not in ("chat", "scan"):
@@ -338,6 +344,8 @@ class H(BaseHTTPRequestHandler):
             write_ctl("mode", mode)
             return self.json(200, {"ok": True, "mode": mode})
         if path == "/api/send":
+            if not common.radio_on() or status().get("radio", "on") != "on":
+                return self.json(409, {"error": "radio is unavailable"})
             text = str(body.get("text", "")).strip()
             if not text:
                 raise ValueError("empty message")
