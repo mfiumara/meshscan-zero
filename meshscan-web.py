@@ -35,7 +35,7 @@ LOCAL_HEADER = "X-Meshscan-Local-Token"
 
 
 def init_local_token():
-    """Create once with owner-only permissions; reject links and unsafe existing files."""
+    """Create once (0600); reject links, other owners and world-readable files."""
     os.makedirs(common.CTL, exist_ok=True)
     path = os.path.join(common.CTL, "local.token")
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
@@ -49,8 +49,10 @@ def init_local_token():
     fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
     with os.fdopen(fd) as f:
         info = os.fstat(f.fileno())
-        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077:
-            raise PermissionError("local token must be an owner-only regular file")
+        # Group bits may be set: the package grants the desktop user read access with an ACL
+        # (which shows up as the group mask). Nobody else may read or write it.
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o027:
+            raise PermissionError("local token must be a regular file owned by this service, not world-readable")
         token = f.read(256).strip()
     if not re.fullmatch(r"[A-Za-z0-9_-]{40,128}", token):
         raise ValueError("invalid local token file")

@@ -1,0 +1,20 @@
+[Unit]
+Description=meshscan LoRa radio: receive-only scanner, or MeshCore chat node
+After=network.target meshscan-web.service
+
+[Service]
+User=meshscan
+Group=meshscan
+SupplementaryGroups=spi i2c gpio
+Environment=PYTHONPATH=/usr/lib/meshscan:/usr/lib/meshscan/vendor
+Environment=MESHSCAN_STATE=/var/lib/meshscan
+ExecStart=/usr/bin/python3 -u /usr/lib/meshscan/meshscan.py
+Restart=always
+RestartSec=3
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

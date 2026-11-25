@@ -1,0 +1,16 @@
+#!/bin/sh
+set -e
+STATE=/var/lib/meshscan
+case "$1" in
+    remove)
+        systemctl daemon-reload 2>/dev/null || true
+        ;;
+    purge)
+        # Purge deletes the packet history, settings and this node's identity.
+        rm -rf "$STATE"
+        if getent passwd meshscan >/dev/null; then deluser --system meshscan >/dev/null 2>&1 || true; fi
+        if getent group meshscan >/dev/null; then delgroup --system meshscan >/dev/null 2>&1 || true; fi
+        systemctl daemon-reload 2>/dev/null || true
+        ;;
+esac
+exit 0

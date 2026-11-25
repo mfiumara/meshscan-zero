@@ -1,0 +1,13 @@
+#!/bin/sh
+set -e
+# Upgrading from the developer install.sh layout: stop its services now so the radio and the
+# database are released before the new files land. postinst removes the old unit files.
+if [ "$1" = install ] || [ "$1" = upgrade ]; then
+    for unit in meshscan meshscan-web; do
+        f="/etc/systemd/system/$unit.service"
+        if [ -f "$f" ] && grep -q "/opt/meshscan/" "$f"; then
+            systemctl stop "$unit" 2>/dev/null || true
+        fi
+    done
+fi
+exit 0

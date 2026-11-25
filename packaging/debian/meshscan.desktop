@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Mesh Map
+Comment=Live map of the LoRa mesh around you, with MeshCore chat
+Exec=/usr/lib/meshscan/meshscan-map
+Icon=share/images/meshscan.png
+Terminal=false

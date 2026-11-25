@@ -1,0 +1,15 @@
+Package: meshscan
+Version: @VERSION@
+Architecture: all
+Maintainer: Mattia Fiumara <mattia@schematik.io>
+Installed-Size: @SIZE@
+Depends: python3 (>= 3.11), python3-libgpiod (>= 2.0), python3-spidev, python3-smbus2, python3-cryptography, python3-pycryptodome, python3-nacl, python3-yaml, python3-periphery, python3-pil, python3-numpy, python3-qrcode, acl, adduser
+Section: hamradio
+Priority: optional
+Homepage: https://github.com/mfiumara/meshscan-zero
+Description: LoRa mesh scanner, live map and MeshCore chat for CardputerZero
+ meshscan drives the Cap LoRa-1262 on an M5Stack CardputerZero. Scan mode
+ listens to MeshCore, Meshtastic and LoRaWAN presets without transmitting and
+ decodes adverts, positions and public channels. Chat mode runs a MeshCore node
+ that only transmits the messages you send. A browser dashboard on port 8080
+ and the Mesh Map launcher app show nodes, traffic and chat.

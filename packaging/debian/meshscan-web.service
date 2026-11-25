@@ -1,0 +1,19 @@
+[Unit]
+Description=meshscan dashboard on port 8080
+After=network.target
+
+[Service]
+User=meshscan
+Group=meshscan
+Environment=PYTHONPATH=/usr/lib/meshscan:/usr/lib/meshscan/vendor
+Environment=MESHSCAN_STATE=/var/lib/meshscan
+ExecStart=/usr/bin/python3 -u /usr/lib/meshscan/meshscan-web.py
+Restart=always
+RestartSec=3
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

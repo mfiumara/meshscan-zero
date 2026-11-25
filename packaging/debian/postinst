@@ -1,0 +1,67 @@
+#!/bin/sh
+set -e
+STATE=/var/lib/meshscan
+OLD_OPT=/opt/meshscan
+OLD_MAP=/opt/meshscan-radar
+OLD_UNITS=/etc/systemd/system
+OLD_APP=/usr/share/APPLaunch
+
+if [ "$1" = configure ]; then
+    # A system user for both services; the radio needs SPI, I2C (Cap power) and GPIO.
+    if ! getent passwd meshscan >/dev/null; then
+        adduser --system --group --home "$STATE" --no-create-home --gecos "meshscan LoRa service" meshscan >/dev/null
+    fi
+    for g in spi i2c gpio; do
+        getent group "$g" >/dev/null && adduser meshscan "$g" >/dev/null 2>&1 || true
+    done
+
+    # Take over from the developer install.sh layout, keeping all data. Only remove files that
+    # are recognisably ours.
+    for unit in meshscan meshscan-web; do
+        f="$OLD_UNITS/$unit.service"
+        if [ -f "$f" ] && grep -q "/opt/meshscan/" "$f"; then
+            systemctl disable "$unit" >/dev/null 2>&1 || true
+            rm -f "$f"
+        fi
+    done
+    if [ -f "$OLD_OPT/meshscan.py" ]; then rm -rf "$OLD_OPT"; fi
+    if [ -f "$OLD_MAP/radar.py" ]; then rm -rf "$OLD_MAP"; fi
+    old_report=/usr/local/bin/meshscan-report
+    if [ -f "$old_report" ] && grep -q "$OLD_OPT" "$old_report"; then rm -f "$old_report"; fi
+    for f in "$OLD_APP/applications/meshscan-radar.desktop" "$OLD_APP/share/images/meshscan-radar.png"; do
+        [ -f "$f" ] && rm -f "$f"
+    done
+
+    # State: owned by the service user, readable for meshscan-report. Secrets stay 0600.
+    mkdir -p "$STATE/ctl/outbox" "$STATE/node"
+    chown -R meshscan:meshscan "$STATE"
+    chmod 0755 "$STATE"
+    chmod 0750 "$STATE/ctl" "$STATE/node"
+    chmod 0755 "$STATE/ctl/outbox"
+    for f in "$STATE/ctl/settings.json" "$STATE/node/identity.key"; do
+        [ -f "$f" ] && chmod 0600 "$f"
+    done
+
+    # Mesh Map runs as the desktop user and controls the radio with a local token that only
+    # works from this device. Create it here so the desktop user can be granted read access
+    # straight away, without logging out (group changes would need a new login).
+    token="$STATE/ctl/local.token"
+    if [ ! -s "$token" ]; then
+        umask 077
+        python3 -c 'import secrets; print(secrets.token_urlsafe(32))' > "$token"
+        chown meshscan:meshscan "$token"
+    fi
+    chmod 0600 "$token"
+    for user in $(getent group video | cut -d: -f4 | tr ',' ' '); do
+        uid=$(id -u "$user" 2>/dev/null || echo 0)
+        if [ "$uid" -ge 1000 ] && [ "$uid" -lt 60000 ]; then
+            setfacl -m "u:$user:x" "$STATE/ctl"
+            setfacl -m "u:$user:r" "$token"
+        fi
+    done
+
+    systemctl daemon-reload
+    systemctl enable meshscan.service meshscan-web.service >/dev/null 2>&1 || true
+    systemctl restart meshscan-web.service meshscan.service || true
+fi
+exit 0

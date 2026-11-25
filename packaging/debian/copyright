@@ -1,0 +1,36 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: meshscan
+Upstream-Contact: Mattia Fiumara <mattia@schematik.io>
+Source: https://github.com/mfiumara/meshscan-zero
+
+Files: *
+Copyright: 2026 Mattia Fiumara
+License: GPL-3.0-or-later
+ See /usr/share/doc/meshscan/licenses/GPL-3.0.txt.
+
+Files: usr/lib/meshscan/meshscan_board.py
+Copyright: MeshTerm authors (https://github.com/jpmartineau/MeshTerm), 2026 Mattia Fiumara
+License: Apache-2.0
+ Adapted from meshterm/core/radionode.py.
+ See /usr/share/doc/meshscan/licenses/Apache-2.0.txt.
+
+Files: usr/lib/meshscan/meshscan_pb.py
+Copyright: 2026 Mattia Fiumara
+License: GPL-3.0-or-later
+ Contains Meshtastic enum names (PortNum, HardwareModel) taken from the Meshtastic
+ protobufs, https://github.com/meshtastic/protobufs, GPL-3.0.
+
+Files: usr/lib/meshscan/vendor/openhop_core/*
+Copyright: openhop-core authors (https://github.com/openhop-dev/openhop-core)
+License: MIT
+ See /usr/share/doc/meshscan/licenses/openhop-core-LICENSE.
+
+Files: usr/lib/meshscan/map/fonts/Inter.ttf
+Copyright: The Inter Project Authors (https://github.com/rsms/inter)
+License: OFL-1.1
+ See /usr/share/doc/meshscan/licenses/Inter-OFL.txt.
+
+Files: usr/lib/meshscan/map/fonts/JetBrainsMono.ttf
+Copyright: The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)
+License: OFL-1.1
+ See /usr/share/doc/meshscan/licenses/JetBrainsMono-OFL.txt.

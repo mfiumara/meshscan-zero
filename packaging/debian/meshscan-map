@@ -1,0 +1,4 @@
+#!/bin/sh
+# Mesh Map, started by APPLaunch as the desktop user.
+export PYTHONPATH=/usr/lib/meshscan:/usr/lib/meshscan/vendor
+exec /usr/bin/python3 /usr/lib/meshscan/map/radar.py "$@"

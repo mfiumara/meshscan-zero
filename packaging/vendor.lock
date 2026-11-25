@@ -1,0 +1,3 @@
+# Pure-Python packages bundled into /usr/lib/meshscan/vendor (everything compiled comes from Debian).
+# name version sha256 url
+openhop-core 1.1.3 fb38aab1bf6e6254bdb682ae213f0ba8b306721e5afc701f10070e19676e92da https://files.pythonhosted.org/packages/a6/dd/ac8167d3addcfe1d669ef1a76ef7f402c9754df7bcd24142f73d1bd1febb/openhop_core-1.1.3-py3-none-any.whl
