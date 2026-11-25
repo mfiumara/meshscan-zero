@@ -23,12 +23,18 @@ So meshscan hops between presets, saves everything it hears to SQLite, and shows
 
 ## Install
 
-On the CardputerZero (Raspberry Pi OS trixie, Cap LoRa-1262 attached):
+**From the AppStore:** install **Mesh Map** from the Store app on your CardputerZero (Cap LoRa-1262 attached).
+
+**From a release `.deb`:** `sudo apt install ./meshscan_<version>_all.deb`
+
+**From source** (developer path; builds the same `.deb`, needs `dpkg-deb`):
 
 ```sh
 git clone https://github.com/mfiumara/meshscan-zero && cd meshscan-zero
 sudo ./install.sh
 ```
+
+The package installs the radio service and the dashboard as systemd services running as their own `meshscan` user (with access to SPI, I²C and GPIO only), plus the **Mesh Map** launcher app. Everything it needs comes from Debian packages, except openhop-core, which is bundled; nothing is downloaded at install time. Upgrading from an older `install.sh` install keeps your database, settings, PIN and node identity.
 
 Then open `http://cardputerzero.local:8080`. The first visit walks you through a short setup:
 
@@ -39,9 +45,11 @@ Then open `http://cardputerzero.local:8080`. The first visit walks you through a
 
 Until setup is done the radio stays in Scan mode and never transmits. Everything is changeable later under ⚙ Settings (saving restarts the radio, about 10 s), including extra `#hashtag` channels (key derived from the name) and private channels (base64 key).
 
-Remove it with `sudo ./uninstall.sh` (keeps your data) or `sudo ./uninstall.sh --purge`. Summarize from the terminal with `meshscan-report [hours]`.
+Remove it with `sudo apt remove meshscan` or `sudo ./uninstall.sh` (both keep your data in `/var/lib/meshscan`), or `sudo apt purge meshscan` / `sudo ./uninstall.sh --purge` to delete the history, settings and node identity too. Summarize from the terminal with `meshscan-report [hours]`.
 
 The radio can only be used by one program at a time; see [Sharing the radio](#sharing-the-radio).
+
+**Building the package:** `packaging/build-deb.sh` writes `dist/meshscan_<version>_all.deb` (reproducible; works on macOS with `brew install dpkg`). `packaging/check-store.sh [packages-clone]` runs the AppStore's own install-path, root-service and listing checks against it.
 
 ## Region presets
 
@@ -72,7 +80,7 @@ Your node doesn't send adverts, so it won't show up in other people's contact li
 
 **Mesh Map** shows only nodes with advertised coordinates on a dark OpenFreeMap basemap. It fits located nodes heard in the last 24 hours; recent nodes glow, older nodes are dimmer, and nodes without GPS are counted rather than placed. RSSI is not shown as node signal: it can belong to the relay that forwarded an advert. The app reconnects after API outages.
 
-`install.sh` installs it too (or run `sudo ./device/install-radar.sh` on its own). Open **Mesh Map** from APPLaunch. Arrows pan; **Sym + / = / -** zoom; **F** fits the last 24 hours; **H** centers on home if configured; **A** toggles older nodes; **Space/Tab** selects and centers a node. **Shift+Q** opens the dashboard QR, and **Esc/q** exits.
+Open **Mesh Map** from APPLaunch. Arrows pan; **Sym + / = / -** zoom; **F** fits the last 24 hours; **H** centers on home if configured; **A** toggles older nodes; **Space/Tab** selects and centers a node. **C** opens chat, **P** pauses or resumes the radio. **Shift+Q** opens the dashboard QR, and **Esc/q** exits.
 
 Press **C** or **Enter** on the map to open chat. **Tab** or left/right arrows switch channels, up/down scroll, **Enter** sends the composer, and **Esc** returns to the map. Shift and the Cardputer Sym layer work while typing. Chat requires setup and chat mode; in scan mode, Enter offers the switch. Sending transmits over the radio.
 
@@ -83,7 +91,7 @@ The web service creates `/var/lib/meshscan/ctl/local.token` with mode `0600`, ow
 
 More device captures: [launcher](docs/chat-launcher.png), [map](docs/chat-map.png), [scan-mode prompt](docs/chat-scan.png), [Public tab](docs/chat-public.png), [private tab](docs/chat-private.png), and [composer](docs/chat-composer.png).
 
-Tiles are fetched asynchronously from [OpenFreeMap](https://openfreemap.org/) (© OpenStreetMap contributors, © OpenMapTiles) and cached under `~/.cache/meshscan-map` for offline use. Uncached areas show a warning when offline. For diagnostics, `MESH_MAP_OFFLINE=1` disables tile fetching and `RADAR_HOME=52.37,4.89` overrides the home marker for that process only. Neither changes meshscan settings. The app uses its own venv under `/opt/meshscan-radar`; the bundled Inter and JetBrains Mono fonts have SIL Open Font licences in `device/fonts/`.
+Tiles are fetched asynchronously from [OpenFreeMap](https://openfreemap.org/) (© OpenStreetMap contributors, © OpenMapTiles) and cached under `~/.cache/meshscan-map` for offline use. Uncached areas show a warning when offline. For diagnostics, `MESH_MAP_OFFLINE=1` disables tile fetching and `RADAR_HOME=52.37,4.89` overrides the home marker for that process only. Neither changes meshscan settings. The bundled Inter and JetBrains Mono fonts have SIL Open Font licences in `device/fonts/`.
 
 ![Mesh map](docs/map-fit.png)
 ![Selected node](docs/map-selected.png)
@@ -108,4 +116,4 @@ Preview. Tested on one CardputerZero v5 in Amsterdam.
 
 ## License
 
-GPL-3.0. See [LICENSE](LICENSE). `meshscan_board.py` is adapted from MeshTerm (Apache-2.0); see [NOTICE](NOTICE). Chat mode uses openhop-core (MIT) and decoding uses the GPL-3.0 `meshtastic` Python package.
+GPL-3.0-or-later. See [LICENSE](LICENSE). `meshscan_board.py` is adapted from MeshTerm (Apache-2.0); see [NOTICE](NOTICE). Chat mode uses openhop-core (MIT, bundled in the package). Meshtastic packets and map tiles are decoded by the small built-in reader in `meshscan_pb.py`, which uses enum names from the Meshtastic protobufs (GPL-3.0).

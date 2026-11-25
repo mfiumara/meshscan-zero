@@ -1,91 +1,61 @@
-# CardputerZero AppStore submission — working notes
+# Submitting Mesh Map to the CardputerZero AppStore
 
-> **Not ready to submit.** The Debian package, radio handoff, migration, store
-> metadata, screenshots, and the device/CI validation required for this release
-> are not complete. Do not run the publish command below until those gates pass.
+Everything up to the actual submission is done and checked. Only the steps that need your GitHub account and your hands are left.
 
-## Intended listing
-
-- **Title:** Mesh Map
-- **Package:** `meshscan`
-- **Summary:** LoRa scanner, live map, browser dashboard and MeshCore chat
-- **Category:** Radio & Comms
-- **Author:** Mattia Fiumara (`mfiumara`)
-- **Source:** https://github.com/mfiumara/meshscan-zero
-- **Candidate share code:** `MSCN` (not reserved until submission; recheck)
-- **Permissions:** network, additional hardware, background service: true;
-  camera, microphone, IMU, external display: false.
-
-The current app receives MeshCore/Meshtastic traffic and shows decoded activity
-on the device and in a browser. Chat mode can transmit user-composed messages.
-Describe pause/release and non-root operation in the final listing only after
-those features are implemented and verified. Licence and third-party notices
-also need an audit before selecting a definitive SPDX identifier.
-
-On the fresh `CardputerZero/packages` snapshot at
-`4355f46a620a9215e83d852f472759ab177ab725`, no package `meshscan`, title
-`Mesh Map`, or share code `MSCN` was present among 188 metadata entries. This
-is a point-in-time check, not a reservation; the catalog can change at any time.
-
-## Important builder distinction
-
-The official `czdev publish --deb` accepts a package built by this repository.
-The generic AppBuilder `build-deb.yml` at commit
-`042356c579d728d684eccb68ed9f8669a32822bc` is a different path: it runs SCons
-and then its own `pack_deb.py`. That script copies a single executable and
-images/fonts, writes its own control file with an M5Stack placeholder
-maintainer, and generates one generic service. It does not consume this
-project's custom maintainer scripts, dependencies, or both services. A harmless
-local probe of the stock packer reproduced those control and payload fields.
-Therefore `app-builder.json` alone does **not** make that workflow produce the
-required package. Use the project's custom build script once it exists; do not
-submit the stock probe package.
-
-## Commands for the owner — only after completion and review
-
-The owner performs login, publish, and the review video. From the AppBuilder
-checkout, the owner logs in once:
+## 1. Log in (once)
 
 ```sh
-/path/to/CardputerZero-AppBuilder/czdev login
+git clone https://github.com/CardputerZero/AppBuilder ~/repos/cz-AppBuilder
+~/repos/cz-AppBuilder/czdev login
 ```
 
-From the root of the completed meshscan repository, with its finished
-`app-builder.json` and verified package:
+It prints a code and a URL: open the URL, enter the code, approve. The token is stored in `~/.czdev/credentials`.
+
+## 2. Build, check, publish
+
+From the root of this repository (that's where `czdev` looks for `app-builder.json`):
 
 ```sh
-/path/to/CardputerZero-AppBuilder/czdev publish --deb /absolute/path/to/meshscan_VERSION_arm64.deb
+cd ~/repos/meshscan-zero
+packaging/build-deb.sh            # -> dist/meshscan_1.0.0_all.deb
+packaging/check-store.sh          # the store's own checks, offline
+~/repos/cz-AppBuilder/czdev publish --deb dist/meshscan_1.0.0_all.deb
 ```
 
-`publish` creates a release asset and a pull request; it is not a dry run. No
-login, publish, PR, or GitHub release has been performed during this work.
+`publish` is not a dry run. It uploads the `.deb` to a release on your fork of `CardputerZero/packages` and opens a pull request with the listing (`app-builder.json` → `meta.json`, icon, screenshots). The first release of an app is merged by a maintainer after a human review and a **device demo**: attach the video to that pull request.
 
-## Review video: 30–45 seconds
+Later versions: bump `version` in `app-builder.json`, rebuild, publish again; those merge automatically once checks pass. Listing-only changes: `czdev publish --meta-only`.
 
-1. **0–5 s:** Show the CardputerZero, LoRa cap and Mesh Map in the launcher;
-   launch it.
-2. **5–15 s:** Show real nodes on the map, select a node and zoom/pan.
-3. **15–25 s:** Show the browser dashboard and its QR link; show chat without
-   transmitting unless the owner explicitly wants to demonstrate it.
-4. **25–35 s:** Once implemented, show radio pause, a handoff to the other LoRa
-   application, and a resume/status change.
-5. **35–45 s:** Return to Mesh Map and exit to APPLaunch.
+The AppBuilder CI template (`build-deb.yml`) can't build this app: its generic packer writes its own control file and a single service, so it would drop our dependencies and maintainer scripts. Always publish the `.deb` from `packaging/build-deb.sh`.
 
-The store requires a real-device demo showing launch, primary features and
-exit, posted by the owner in the submission PR. Avoid showing PINs, private
-channel keys, private messages, session cookies or the local control token.
+## 3. Review video (30–45 s, one take, the real device)
 
-## Remaining release gates
+| Time | Show |
+|---|---|
+| 0–5 s | The CardputerZero with the Cap LoRa-1262 on. Scroll the launcher to **Mesh Map** and open it. |
+| 5–15 s | The map with real nodes. Zoom in (Sym +), press Tab to select a node: name, type, last heard. |
+| 15–25 s | Press **C**: chat with channel tabs and live messages. Type a few characters to show the keyboard, then Esc. Don't send on Public on camera unless you mean to. |
+| 25–32 s | Press **P**: the panel switches to *Radio paused*. Press **P** again: back to LIVE. |
+| 32–40 s | Phone next to it: scan the QR (Shift+Q) or open `http://cardputerzero.local:8080` and show the dashboard updating. |
+| 40–45 s | Esc back to the launcher. |
 
-- Build an actual reproducible `.deb`, with pinned and licensed dependencies,
-  no install-time pip/network access, non-root radio and web services, and a
-  safe migration from the legacy `/opt`/`/etc/systemd/system` install.
-- Browser sessions are held in memory and will be lost when the web service
-  restarts. This is accepted for migration: users can re-enter their PIN.
-- Implement and verify persistent pause/resume, radio-busy reporting, actual
-  GPIO/SPI/I²C release, and a no-transmit handoff to MeshTerm.
-- Generate fresh real-device screenshots and a suitable store icon; run the
-  official package path, metadata and czdev preflight checks against the actual
-  package, and verify upgrades, remove/reinstall and the final device state.
-- Recheck package name, title and share-code uniqueness immediately before
-  publication, and complete the full third-party licensing/NOTICE audit.
+Keep PINs, private channel keys and private messages out of frame.
+
+## 4. Listing (as submitted)
+
+- **Title:** Mesh Map · **Package:** `meshscan` · **Share code:** `MSCN`
+- **Summary:** See the LoRa mesh around you: live map, MeshCore chat and a browser dashboard
+- **Category:** Radio & Comms · **Licence:** GPL-3.0-or-later
+- **Permissions:** network, additional hardware, background service
+- **Description:** `store.description` in `app-builder.json`
+- **Icon:** `store/icon.png` · **Screenshots:** `screenshots/` (map, selected node, chat, dashboard QR)
+
+On `CardputerZero/packages` main (25 Nov 2026) the package name, title and share code were all free. That's first-come, first-served, not a reservation.
+
+## Likely review questions
+
+- **Background service:** the radio and dashboard keep running when Mesh Map is closed; that's what keeps the history and the browser dashboard working. Both run as the `meshscan` system user, not root, with only the `spi`, `i2c` and `gpio` groups.
+- **Network:** the dashboard listens on port 8080 on the local network. Viewing is open; sending, switching modes and settings need a PIN. Map tiles come from OpenFreeMap.
+- **Shared radio:** MeshTerm, MeshCore and the LoRa app use the same Cap. meshscan never stops other apps or services. P (or the dashboard's radio button) releases the radio; if another app holds it, meshscan shows "Radio in use by another app" and waits.
+- **Transmitting:** Scan mode never transmits, and neither does anything before the first-run setup. Chat mode only transmits messages you send.
+- **Removal:** `apt remove` keeps `/var/lib/meshscan`; `apt purge` deletes it and the `meshscan` user.

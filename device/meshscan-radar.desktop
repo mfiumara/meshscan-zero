@@ -1,7 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Mesh Map
-Comment=Map of meshscan nodes with locations
-Exec=/opt/meshscan-radar/venv/bin/python /opt/meshscan-radar/radar.py
-Icon=share/images/meshscan-radar.png
-Terminal=false
