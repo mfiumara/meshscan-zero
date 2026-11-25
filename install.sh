@@ -9,7 +9,9 @@ set -euo pipefail
 [ "$(id -u)" = 0 ] || { echo "run with sudo"; exit 1; }
 cd "$(dirname "$0")"
 command -v dpkg-deb >/dev/null || { echo "dpkg-deb not found"; exit 1; }
-deb=$(sudo -u "${SUDO_USER:-root}" packaging/build-deb.sh | head -1)
+out=$(sudo -u "${SUDO_USER:-root}" packaging/build-deb.sh)
+deb=$(printf '%s\n' "$out" | head -n 1)
+echo "built $deb"
 apt-get install -y "$deb"
 IP=$(hostname -I | awk '{print $1}')
 echo
